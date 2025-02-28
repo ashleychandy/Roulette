@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { ethers } from "ethers";
 import { motion, AnimatePresence } from "framer-motion";
 import { QueryClientProvider, QueryClient } from "@tanstack/react-query";
@@ -44,12 +44,12 @@ const Toast = ({ message, type, onClose }) => (
                 backdrop-blur-md border transition-all duration-300 z-50
                 ${
                   type === "success"
-                    ? "bg-gaming-success/10 border-gaming-success/30"
+                    ? "bg-gaming-success/20 border-gaming-success/50"
                     : type === "error"
-                    ? "bg-gaming-error/10 border-gaming-error/30"
+                    ? "bg-gaming-error/20 border-gaming-error/50"
                     : type === "warning"
-                    ? "bg-gaming-warning/10 border-gaming-warning/30"
-                    : "bg-gaming-info/10 border-gaming-info/30"
+                    ? "bg-gaming-warning/20 border-gaming-warning/50"
+                    : "bg-gaming-info/20 border-gaming-info/50"
                 }`}
   >
     <div className="flex items-center justify-between">
@@ -58,19 +58,19 @@ const Toast = ({ message, type, onClose }) => (
           className={`p-2 rounded-full 
                       ${
                         type === "success"
-                          ? "bg-gaming-success/20"
+                          ? "bg-gaming-success/30"
                           : type === "error"
-                          ? "bg-gaming-error/20"
+                          ? "bg-gaming-error/30"
                           : type === "warning"
-                          ? "bg-gaming-warning/20"
-                          : "bg-gaming-info/20"
+                          ? "bg-gaming-warning/30"
+                          : "bg-gaming-info/30"
                       }`}
         ></div>
-        <p className="text-white/90 font-medium">{message}</p>
+        <p className="text-white font-medium text-shadow">{message}</p>
       </div>
       <button
         onClick={onClose}
-        className="text-white/60 hover:text-white/90 transition-colors"
+        className="text-white/80 hover:text-white transition-colors"
       >
         <svg
           className="w-5 h-5"
@@ -170,6 +170,8 @@ function App() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const queryClient = new QueryClient();
+
+  const dropdownRef = useRef(null);
 
   const addToast = useCallback((message, type = "info") => {
     const id = `toast_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -452,6 +454,19 @@ function App() {
     addToast("Logged out successfully", "success");
   };
 
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setDropdownOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <div className="min-h-screen bg-white">
@@ -461,196 +476,156 @@ function App() {
 
         <header className="px-6 border-b border-[#22AD74]/20 bg-white sticky top-0 z-50 shadow-sm">
           <div className="max-w-7xl mx-auto flex justify-between items-center h-16">
-            <div className="flex items-center gap-3 hover:opacity-90 transition-opacity cursor-pointer">
+            <div className="flex items-center">
               <a
                 href="https://gamacoin.ai/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3"
+                className="flex items-center gap-3 hover:opacity-90 transition-all duration-300 group"
               >
                 <img
                   src="/assets/gama-logo.svg"
                   alt="GAMA Logo"
-                  className="h-8 sm:h-9"
+                  className="h-8 sm:h-9 group-hover:scale-105 transition-transform duration-300"
                 />
-                <span className="text-xl sm:text-2xl font-bold text-[#22AD74] bg-gradient-to-r from-[#22AD74] to-[#22AD74]/70 text-transparent bg-clip-text">
+                <span className="text-xl sm:text-2xl font-bold text-[#22AD74] bg-gradient-to-r from-[#22AD74] to-[#22AD74]/70 text-transparent bg-clip-text group-hover:to-[#22AD74] transition-all duration-300">
                   Roulette
                 </span>
               </a>
             </div>
-            {account ? (
-              <div className="flex items-center gap-2 sm:gap-4">
-                {chainId && (
-                  <div className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-lg text-sm bg-[#22AD74]/5 border border-[#22AD74]/20">
-                    <div
-                      className={`w-2 h-2 rounded-full ${
-                        SUPPORTED_CHAIN_IDS.includes(chainId)
-                          ? "bg-[#22AD74]"
-                          : "bg-red-500"
-                      } animate-pulse`}
-                    />
-                    <span className="text-gray-600">
-                      {chainId === 50
-                        ? "XDC Mainnet"
-                        : chainId === 51
-                        ? "Apothem Testnet"
-                        : "Unsupported Network"}
-                    </span>
-                  </div>
-                )}
-                <div className="px-4 py-2 rounded-lg text-sm bg-[#22AD74]/5 border border-[#22AD74]/20 hover:bg-[#22AD74]/10 transition-colors">
-                  <span className="text-gray-600 hidden sm:inline">
-                    Connected:
-                  </span>{" "}
-                  <span className="text-gray-900">
-                    {account.slice(0, 6)}...{account.slice(-4)}
-                  </span>
-                </div>
-                <div className="relative">
+
+            <div className="hidden sm:flex items-center gap-4">
+              <button
+                onClick={() =>
+                  window.open(
+                    "https://app.xspswap.finance/#/swap?outputCurrency=0x678adf7955d8f6dcaa9e2fcc1c5ba70bccc464e6",
+                    "_blank"
+                  )
+                }
+                className="text-gray-600 hover:text-[#22AD74] transition-all duration-300 flex items-center gap-2 font-medium hover:-translate-y-0.5"
+              >
+                Buy GAMA
+              </button>
+
+              <div className="h-4 w-px bg-gray-200"></div>
+
+              <a
+                href="https://diceroll.gamacoin.ai/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-600 hover:text-[#22AD74] transition-all duration-300 flex items-center gap-2 font-medium hover:-translate-y-0.5"
+              >
+                Dice
+              </a>
+
+              <div className="h-4 w-px bg-gray-200"></div>
+
+              <a
+                href="https://gamacoin.ai/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-600 hover:text-[#22AD74] transition-all duration-300 flex items-center gap-2 font-medium hover:-translate-y-0.5"
+              >
+                Home
+              </a>
+
+              <div className="h-4 w-px bg-gray-200"></div>
+
+              {account ? (
+                <div className="relative" ref={dropdownRef}>
                   <button
                     onClick={() => setDropdownOpen(!dropdownOpen)}
-                    className="p-2 rounded-lg bg-[#22AD74]/5 border border-[#22AD74]/20 hover:bg-[#22AD74]/10 transition-colors group"
+                    className="px-4 py-2 rounded-lg text-sm bg-[#22AD74]/5 border border-[#22AD74]/20 hover:bg-[#22AD74]/10 transition-colors flex items-center gap-2"
                   >
+                    <span className="text-gray-900">
+                      {account.slice(0, 6)}...{account.slice(-4)}
+                    </span>
                     <svg
-                      className="w-6 h-6 text-[#22AD74] group-hover:rotate-12 transition-transform"
+                      className={`w-4 h-4 text-gray-600 transition-transform duration-200 ${
+                        dropdownOpen ? "rotate-180" : ""
+                      }`}
                       fill="none"
-                      stroke="currentColor"
                       viewBox="0 0 24 24"
+                      stroke="currentColor"
                     >
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={2}
-                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                        d="M19 9l-7 7-7-7"
                       />
                     </svg>
                   </button>
-                  {dropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-56 rounded-xl bg-white border border-[#22AD74]/20 shadow-xl z-50 overflow-hidden">
-                      <div className="py-2">
-                        <div className="px-4 py-2 bg-[#22AD74]/5">
-                          <p className="text-sm font-medium text-gray-900">
-                            Account
-                          </p>
-                          <p className="text-xs text-gray-500 truncate">
-                            {account}
-                          </p>
-                        </div>
+
+                  {/* Dropdown Menu */}
+                  <AnimatePresence>
+                    {dropdownOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.2 }}
+                        className="absolute right-0 mt-2 w-48 rounded-xl bg-white shadow-lg border border-gray-200 py-1 z-50"
+                      >
                         <button
-                          className="w-full px-4 py-2.5 text-left text-gray-700 hover:bg-[#22AD74]/5 transition-colors flex items-center gap-2"
-                          onClick={() => {
-                            setDropdownOpen(false);
-                            window.open(
-                              "https://app.xspswap.finance/#/swap?outputCurrency=0x678adf7955d8f6dcaa9e2fcc1c5ba70bccc464e6",
-                              "_blank"
-                            );
-                          }}
-                        >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-                            />
-                          </svg>
-                          Buy GAMA Token
-                        </button>
-                        <div className="px-4 py-2 text-xs font-medium text-gray-500 bg-gray-50">
-                          Networks
-                        </div>
-                        <button
-                          className="w-full px-4 py-2.5 text-left text-gray-700 hover:bg-[#22AD74]/5 transition-colors flex items-center gap-2"
                           onClick={() => {
                             switchNetwork("mainnet");
                             setDropdownOpen(false);
                           }}
+                          className="w-full px-4 py-2 text-sm text-gray-700 hover:bg-[#22AD74]/5 flex items-center gap-2"
                         >
                           <div
                             className={`w-2 h-2 rounded-full ${
                               chainId === 50 ? "bg-[#22AD74]" : "bg-gray-300"
                             }`}
                           />
-                          XDC Mainnet
+                          Switch to Mainnet
                         </button>
                         <button
-                          className="w-full px-4 py-2.5 text-left text-gray-700 hover:bg-[#22AD74]/5 transition-colors flex items-center gap-2"
                           onClick={() => {
                             switchNetwork("testnet");
                             setDropdownOpen(false);
                           }}
+                          className="w-full px-4 py-2 text-sm text-gray-700 hover:bg-[#22AD74]/5 flex items-center gap-2"
                         >
                           <div
                             className={`w-2 h-2 rounded-full ${
                               chainId === 51 ? "bg-[#22AD74]" : "bg-gray-300"
                             }`}
                           />
-                          Apothem Testnet
+                          Switch to Testnet
                         </button>
-                        <div className="border-t border-[#22AD74]/20 my-1"></div>
+                        <div className="h-px bg-gray-200 my-1" />
                         <button
-                          className="w-full px-4 py-2.5 text-left text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2"
                           onClick={() => {
                             handleLogout();
                             setDropdownOpen(false);
                           }}
+                          className="w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
                         >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                            />
-                          </svg>
                           Logout
                         </button>
-                      </div>
-                    </div>
-                  )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
-              </div>
-            ) : (
-              <button
-                onClick={connectWallet}
-                className="px-6 py-2.5 rounded-lg bg-[#22AD74] text-white border border-[#22AD74]/20 hover:bg-[#22AD74]/90 transition-all duration-300 flex items-center gap-2 hover:gap-3"
-                disabled={loadingStates.wallet}
-              >
-                {loadingStates.wallet ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Connecting...
-                  </>
-                ) : (
-                  <>
-                    Connect Wallet
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M14 5l7 7m0 0l-7 7m7-7H3"
-                      />
-                    </svg>
-                  </>
-                )}
-              </button>
-            )}
+              ) : (
+                <button
+                  onClick={connectWallet}
+                  className="px-6 py-2 rounded-lg bg-[#22AD74] text-white border border-[#22AD74]/20 hover:bg-[#22AD74]/90 transition-all duration-300 flex items-center gap-2"
+                  disabled={loadingStates.wallet}
+                >
+                  {loadingStates.wallet ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Connecting...
+                    </>
+                  ) : (
+                    "Connect"
+                  )}
+                </button>
+              )}
+            </div>
           </div>
         </header>
 

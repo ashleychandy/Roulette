@@ -108,9 +108,7 @@ const bottomBettingOptions = [
 const CHIP_VALUES = [
   { value: "1000000000000000000", label: "1" },
   { value: "5000000000000000000", label: "5" },
-  { value: "10000000000000000000", label: "10" },
   { value: "50000000000000000000", label: "50" },
-  { value: "100000000000000000000", label: "100" },
   { value: "500000000000000000000", label: "500" },
   { value: "1000000000000000000000", label: "1K" },
   { value: "5000000000000000000000", label: "5K" },
@@ -127,20 +125,20 @@ const isRed = (number) => redNumbers.includes(Number(number));
 // Last Number Display component
 const LastNumberDisplay = ({ number, getNumberBackgroundClass }) => {
   const bgClass = getNumberBackgroundClass(number);
+  const isPlaceholder =
+    number === null || number === undefined || isNaN(number);
 
   return (
     <div className="flex items-center justify-center w-24">
       <div className="relative w-full">
-        <div className="text-sm text-secondary-300 font-medium text-center mb-2">
+        <div className="text-sm text-gray-600 font-medium text-center mb-2">
           Last Number
         </div>
         <div
-          className={`aspect-square w-full rounded-xl flex items-center justify-center font-bold relative transform transition-all duration-500 hover:scale-105 ${bgClass} shadow-lg hover:shadow-2xl border border-white/20 animate-float`}
+          className={`aspect-square w-full rounded-xl flex items-center justify-center font-bold relative transform transition-all duration-500 hover:scale-105 ${bgClass} shadow-lg hover:shadow-2xl animate-float`}
         >
-          <span className="text-white text-3xl font-bold animate-fadeIn">
-            {number !== null && number !== undefined && !isNaN(number)
-              ? number
-              : "-"}
+          <span className="text-3xl font-bold animate-fadeIn">
+            {isPlaceholder ? "-" : number}
           </span>
         </div>
       </div>
@@ -149,14 +147,34 @@ const LastNumberDisplay = ({ number, getNumberBackgroundClass }) => {
 };
 
 // Add BetChip component before BettingBoard
-const BetChip = ({ amount, className = "", style = {} }) => (
-  <div
-    className={`absolute w-8 h-8 rounded-full bg-gaming-primary border-2 border-white flex items-center justify-center text-xs font-bold shadow-lg ${className}`}
-    style={style}
-  >
-    {amount}
-  </div>
-);
+const BetChip = ({ amount, className = "", style = {} }) => {
+  // Helper function to format large numbers
+  const formatAmount = (value) => {
+    const num = Number(value);
+    if (num >= 1000000) {
+      return `${(num / 1000000).toFixed(1)}M`;
+    }
+    if (num >= 1000) {
+      return `${(num / 1000).toFixed(1)}K`;
+    }
+    // For small numbers, ensure at least one decimal place if not whole
+    return num % 1 === 0 ? num.toString() : num.toFixed(1);
+  };
+
+  return (
+    <div
+      className={`absolute w-8 h-8 rounded-full bg-[#22AD74] border-2 border-white/50 flex items-center justify-center text-[11px] font-bold shadow-lg text-white transform hover:scale-110 transition-all duration-300 group ${className}`}
+      style={style}
+    >
+      <span className="group-hover:opacity-0 transition-opacity duration-200">
+        {formatAmount(amount)}
+      </span>
+      <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+        {amount}
+      </span>
+    </div>
+  );
+};
 
 const BettingBoard = ({
   onBetSelect,
@@ -214,14 +232,14 @@ const BettingBoard = ({
               bet.numbers?.[0] ===
                 (Array.isArray(numbers) ? numbers[0] : numbers)
           );
-          return bet
-            ? Math.floor(parseFloat(ethers.formatEther(bet.amount)))
-            : 0;
+          // Return exact amount without rounding for small numbers
+          return bet ? parseFloat(ethers.formatEther(bet.amount)) : 0;
         }
 
         // For all other bets
         const bet = selectedBets.find((bet) => bet.type === type);
-        return bet ? Math.floor(parseFloat(ethers.formatEther(bet.amount))) : 0;
+        // Return exact amount without rounding for small numbers
+        return bet ? parseFloat(ethers.formatEther(bet.amount)) : 0;
       } catch (error) {
         console.error("Error in getBetAmount:", error);
         return 0;
@@ -247,7 +265,7 @@ const BettingBoard = ({
   ];
 
   return (
-    <div className="flex flex-col gap-3 p-8 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl hover:shadow-3xl transition-all duration-300 relative">
+    <div className="flex flex-col gap-3 relative">
       {/* Main betting grid */}
       <div className="grid grid-cols-[auto_45px_1fr] gap-2">
         <div className="flex flex-col gap-2">
@@ -261,7 +279,7 @@ const BettingBoard = ({
           <div className="flex flex-col gap-2">
             <button
               onClick={onUndoBet}
-              className="w-24 h-10 bg-gray-900 hover:bg-gray-800 text-secondary-300 hover:text-white rounded-xl font-semibold transform hover:scale-105 transition-all duration-300 disabled:opacity-50 flex items-center justify-center gap-2 border border-white/10"
+              className="w-24 h-10 bg-white hover:bg-gray-50 text-gray-700 hover:text-gray-900 rounded-xl font-semibold transform hover:scale-105 transition-all duration-300 disabled:opacity-50 flex items-center justify-center gap-2 border border-gray-200"
               disabled={disabled || selectedBets.length === 0}
             >
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
@@ -271,7 +289,7 @@ const BettingBoard = ({
             </button>
             <button
               onClick={onClearBets}
-              className="w-24 h-10 bg-gaming-error/10 hover:bg-gaming-error/20 text-gaming-error rounded-xl font-semibold transform hover:scale-105 transition-all duration-300 disabled:opacity-50 flex items-center justify-center gap-2 border border-gaming-error/20"
+              className="w-24 h-10 bg-white hover:bg-red-50 text-red-600 rounded-xl font-semibold transform hover:scale-105 transition-all duration-300 disabled:opacity-50 flex items-center justify-center gap-2 border border-red-200"
               disabled={disabled || selectedBets.length === 0}
             >
               Clear
@@ -286,15 +304,15 @@ const BettingBoard = ({
             onMouseEnter={() => handleMouseEnter(0)}
             onMouseLeave={handleMouseLeave}
             disabled={disabled}
-            className={`w-[45px] h-[147px] rounded-xl text-white/90 font-bold flex items-center justify-center transition-all duration-300 hover:scale-105 relative
+            className={`relative rounded-xl text-xl font-bold transition-all duration-300 transform border hover:z-10 active:scale-95 cursor-pointer w-[45px] h-[147px] flex items-center justify-center shadow-lg
               ${
                 isNumberHovered(0)
-                  ? "bg-gradient-to-br from-emerald-500 to-emerald-600 border-emerald-400 shadow-emerald-500/30 ring-2 ring-offset-2 ring-offset-secondary-900 scale-105 z-10"
-                  : "bg-gradient-to-br from-emerald-500/80 to-emerald-600/80 border-emerald-400/50"
-              } border hover:shadow-lg hover:from-emerald-500 hover:to-emerald-600`}
+                  ? "bg-gradient-to-br from-[#22AD74] to-[#22AD74]/80 ring-2 ring-offset-2 ring-[#22AD74] scale-105 z-10 border-[#22AD74]"
+                  : "bg-gradient-to-br from-[#22AD74]/90 to-[#22AD74]/70 border-[#22AD74]/20 hover:scale-105 hover:from-[#22AD74] hover:to-[#22AD74]"
+              }`}
           >
             <div className="flex flex-col items-center gap-1">
-              <span className="text-2xl">0</span>
+              <span className="text-white text-2xl">0</span>
               {getBetAmount([0], BetTypes.STRAIGHT) > 0 && (
                 <BetChip
                   amount={getBetAmount([0], BetTypes.STRAIGHT)}
@@ -319,13 +337,13 @@ const BettingBoard = ({
                   onMouseEnter={() => handleMouseEnter(number)}
                   onMouseLeave={handleMouseLeave}
                   disabled={disabled}
-                  className={`relative rounded-xl text-xl font-bold transition-all duration-300 transform border border-white/10 hover:scale-105 hover:z-10 active:scale-95 cursor-pointer backdrop-blur-sm shadow-lg hover:shadow-2xl text-white ${
+                  className={`relative rounded-xl text-xl font-bold transition-all duration-300 transform border border-gray-200 hover:scale-105 hover:z-10 active:scale-95 cursor-pointer bg-white shadow-lg hover:shadow-2xl text-gray-900 ${
                     isRed(number)
                       ? "bg-gradient-to-br from-gaming-primary/90 to-gaming-accent/90 hover:from-gaming-primary hover:to-gaming-accent border-gaming-primary/20 hover:shadow-gaming-primary/30"
                       : "bg-gradient-to-br from-gray-800/90 to-gray-900/90 hover:from-gray-700 hover:to-gray-800 border-gray-700/20 hover:shadow-gray-500/30"
                   } ${
                     isNumberHovered(number)
-                      ? "ring-2 ring-offset-2 ring-offset-secondary-900 scale-105 z-10"
+                      ? "ring-2 ring-offset-2 ring-[#22AD74] scale-105 z-10 bg-[#22AD74]/10"
                       : ""
                   }`}
                 >
@@ -362,25 +380,8 @@ const BettingBoard = ({
                 }}
                 onMouseLeave={handleMouseLeave}
                 disabled={disabled}
-                className={`h-[45px] rounded-xl relative text-white border border-white/10 shadow-lg hover:shadow-xl transform transition-all duration-300 hover:scale-105 
-                  bg-gradient-to-br from-secondary-800/90 to-secondary-900/90 hover:from-secondary-700 hover:to-secondary-800 text-white/90 hover:shadow-secondary-500/30 ${
-                    isBetTypeHovered(
-                      rowIndex === 0
-                        ? BetTypes.COLUMN_THIRD
-                        : rowIndex === 1
-                        ? BetTypes.COLUMN_SECOND
-                        : BetTypes.COLUMN_FIRST,
-                      BetTypes.getNumbers(
-                        rowIndex === 0
-                          ? BetTypes.COLUMN_THIRD
-                          : rowIndex === 1
-                          ? BetTypes.COLUMN_SECOND
-                          : BetTypes.COLUMN_FIRST
-                      )
-                    )
-                      ? "ring-2 ring-offset-2 ring-offset-secondary-900 scale-105 z-20 shadow-[0_0_20px_rgba(var(--gaming-primary),0.4)] border-gaming-primary/50"
-                      : ""
-                  } hover:z-10 active:scale-95 cursor-pointer backdrop-blur-sm`}
+                className={`h-[45px] rounded-xl relative text-[#22AD74] border border-[#22AD74] shadow-lg hover:shadow-xl transform transition-all duration-300 hover:scale-105 
+                bg-white hover:bg-[#22AD74]/5 hover:shadow-[#22AD74]/30`}
               >
                 2:1
                 {(() => {
@@ -407,7 +408,7 @@ const BettingBoard = ({
       </div>
 
       {/* Dozen bets */}
-      <div className="grid grid-cols-3 gap-2 mt-2">
+      <div className="grid grid-cols-3 gap-2 -mt-20 w-[calc(85%-92px)] ml-[160px]">
         {dozenBettingOptions.map((option) => (
           <button
             key={option.label}
@@ -421,12 +422,8 @@ const BettingBoard = ({
             }}
             onMouseLeave={handleMouseLeave}
             disabled={disabled}
-            className={`h-[45px] rounded-xl relative text-white border border-white/10 shadow-lg hover:shadow-xl transform transition-all duration-300 hover:scale-105 
-              bg-gradient-to-br from-secondary-800/90 to-secondary-900/90 hover:from-secondary-700 hover:to-secondary-800 text-white/90 hover:shadow-secondary-500/30 ${
-                isBetTypeHovered(option.type, BetTypes.getNumbers(option.type))
-                  ? "ring-2 ring-offset-2 ring-offset-secondary-900 scale-105 z-20 shadow-[0_0_20px_rgba(var(--gaming-primary),0.4)] border-gaming-primary/50"
-                  : ""
-              } hover:z-10 active:scale-95 cursor-pointer backdrop-blur-sm`}
+            className={`h-[45px] rounded-xl relative text-[#22AD74] border border-[#22AD74] shadow-lg hover:shadow-xl transform transition-all duration-300 hover:scale-105 
+              bg-white hover:bg-[#22AD74]/5 hover:shadow-[#22AD74]/30`}
           >
             {option.label}
             {getBetAmount(BetTypes.getNumbers(option.type), option.type) >
@@ -444,7 +441,7 @@ const BettingBoard = ({
       </div>
 
       {/* Bottom betting options */}
-      <div className="grid grid-cols-6 gap-2">
+      <div className="grid grid-cols-6 gap-2 -mt-1 w-[calc(85%-92px)] ml-[160px]">
         {bottomBettingOptions.map((option) => (
           <button
             key={option.label}
@@ -458,18 +455,17 @@ const BettingBoard = ({
             }}
             onMouseLeave={handleMouseLeave}
             disabled={disabled}
-            className={`h-[45px] rounded-xl relative text-white border border-white/10 shadow-lg hover:shadow-xl transform transition-all duration-300 hover:scale-105 
-              ${
-                option.type === BetTypes.RED
-                  ? "bg-gradient-to-br from-gaming-primary/90 to-gaming-primary/80 hover:from-gaming-primary hover:to-gaming-primary/90 text-white/90 hover:shadow-gaming-primary/30"
-                  : option.type === BetTypes.BLACK
-                  ? "bg-gradient-to-br from-gray-800/90 to-gray-900/90 hover:from-gray-700 hover:to-gray-800 text-white/90 hover:shadow-gray-500/30"
-                  : "bg-gradient-to-br from-secondary-800/90 to-secondary-900/90 hover:from-secondary-700 hover:to-secondary-800 text-white/90 hover:shadow-secondary-500/30"
-              } ${
+            className={`h-[45px] rounded-xl relative ${
+              option.type === BetTypes.RED
+                ? "bg-gradient-to-br from-gaming-primary/90 to-gaming-accent/90 hover:from-gaming-primary hover:to-gaming-accent border-gaming-primary/20 hover:shadow-gaming-primary/30 text-white"
+                : option.type === BetTypes.BLACK
+                ? "bg-gradient-to-br from-gray-800/90 to-gray-900/90 hover:from-gray-700 hover:to-gray-800 border-gray-700/20 hover:shadow-gray-500/30 text-white"
+                : "text-[#22AD74] border border-[#22AD74] bg-white hover:bg-[#22AD74]/10 hover:shadow-[#22AD74]/30"
+            } shadow-lg hover:shadow-xl transform transition-all duration-300 hover:scale-105 ${
               isBetTypeHovered(option.type, BetTypes.getNumbers(option.type))
-                ? "ring-2 ring-offset-2 ring-offset-secondary-900 scale-105 z-20 shadow-[0_0_20px_rgba(var(--gaming-primary),0.4)] border-gaming-primary/50"
+                ? "ring-2 ring-offset-2 ring-[#22AD74] scale-105 z-10 bg-[#22AD74]/10"
                 : ""
-            } hover:z-10 active:scale-95 cursor-pointer backdrop-blur-sm`}
+            }`}
           >
             {option.label}
             {getBetAmount(BetTypes.getNumbers(option.type), option.type) >
@@ -489,97 +485,7 @@ const BettingBoard = ({
   );
 };
 
-// Add BetControls component
-const BetControls = ({
-  selectedChipValue,
-  onChipValueChange,
-  selectedBets,
-  onPlaceBets,
-  onApprove,
-  isApproved,
-  isCheckingApproval,
-  disabled,
-  gameState,
-}) => {
-  return (
-    <div className="bet-controls grid grid-cols-[2fr_1fr] gap-6">
-      {/* Chip Selection */}
-      <div>
-        <h3 className="text-lg font-semibold text-secondary-300 mb-3">
-          Select Chip Value
-        </h3>
-        <div className="chip-selector flex flex-wrap gap-2">
-          {CHIP_VALUES.map((chip) => (
-            <button
-              key={chip.value}
-              onClick={() => onChipValueChange(chip.value)}
-              disabled={disabled}
-              className={`h-12 px-6 rounded-xl flex items-center justify-center font-bold transition-all duration-300 
-                ${
-                  selectedChipValue === chip.value
-                    ? "bg-gaming-primary text-white shadow-glow scale-105"
-                    : "bg-secondary-800/50 text-secondary-300 hover:bg-secondary-700/50 hover:text-white hover:scale-105"
-                } ${
-                disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-              }`}
-            >
-              {chip.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Place Bet Button */}
-      <div className="flex items-end">
-        {isCheckingApproval ? (
-          <button
-            className="h-14 w-full bg-secondary-800/50 text-secondary-300 rounded-xl font-bold flex items-center justify-center gap-2 disabled:opacity-50"
-            disabled={true}
-          >
-            <LoadingSpinner size="small" />
-            Checking Approval...
-          </button>
-        ) : isApproved ? (
-          <button
-            onClick={onPlaceBets}
-            disabled={disabled || selectedBets.length === 0}
-            className={`h-14 w-full rounded-xl font-bold flex items-center justify-center gap-2 transition-all duration-300
-              ${
-                disabled || selectedBets.length === 0
-                  ? "bg-secondary-800/50 text-secondary-300"
-                  : "bg-gradient-to-br from-gray-900 to-gray-800 text-white hover:scale-105 shadow-lg hover:shadow-white/20 border border-white/10 hover:border-white/20"
-              }`}
-          >
-            {gameState.isProcessing ? (
-              <>
-                <LoadingSpinner size="small" />
-                Processing...
-              </>
-            ) : (
-              <>
-                <span className="text-xl">🎲</span>
-                Place Bets
-              </>
-            )}
-          </button>
-        ) : (
-          <button
-            onClick={onApprove}
-            disabled={disabled}
-            className={`h-14 w-full rounded-xl font-bold flex items-center justify-center gap-2 transition-all duration-300
-              ${
-                disabled
-                  ? "bg-secondary-800/50 text-secondary-300"
-                  : "bg-gradient-to-br from-gaming-success to-emerald-500 text-white hover:scale-105 shadow-lg hover:shadow-gaming-success/20"
-              }`}
-          >
-            Approve Token
-          </button>
-        )}
-      </div>
-    </div>
-  );
-};
+//85%-92px160px
 
 // Add helper function to get bet type name
 const getBetTypeName = (betType, numbers) => {
@@ -689,8 +595,8 @@ const BettingHistory = ({ userData, isLoading, error }) => {
 
   if (isLoading) {
     return (
-      <div className="betting-history glass-panel p-6 space-y-6">
-        <h3 className="text-2xl font-bold text-white/90">Recent Bets</h3>
+      <div className="betting-history bg-white p-6 space-y-6 rounded-xl border border-gray-200">
+        <h3 className="text-2xl font-bold text-gray-900">Recent Bets</h3>
         <div className="flex justify-center items-center py-8">
           <LoadingSpinner />
         </div>
@@ -700,9 +606,9 @@ const BettingHistory = ({ userData, isLoading, error }) => {
 
   if (error) {
     return (
-      <div className="betting-history glass-panel p-6 space-y-6">
-        <h3 className="text-2xl font-bold text-white/90">Recent Bets</h3>
-        <div className="text-center text-gaming-error py-4">
+      <div className="betting-history bg-white p-6 space-y-6 rounded-xl border border-gray-200">
+        <h3 className="text-2xl font-bold text-gray-900">Recent Bets</h3>
+        <div className="text-center text-red-600 py-4">
           Failed to load betting history. Please try again later.
         </div>
       </div>
@@ -710,18 +616,20 @@ const BettingHistory = ({ userData, isLoading, error }) => {
   }
 
   return (
-    <div className="betting-history rounded-2xl border border-white/10 shadow-2xl hover:shadow-3xl transition-all duration-300 p-6 bg-secondary-900">
+    <div className="betting-history bg-white rounded-2xl border border-gray-200 shadow-2xl hover:shadow-3xl transition-all duration-300 p-6">
       {/* History Header with Toggle */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-4">
-          <h2 className="text-lg font-semibold text-white">Betting History</h2>
+          <h2 className="text-lg font-semibold text-gray-900">
+            Betting History
+          </h2>
           <div className="flex gap-2">
             <button
               onClick={() => setFilter("all")}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
                 filter === "all"
-                  ? "bg-gaming-primary text-white"
-                  : "text-white/70 hover:text-white bg-secondary-800 hover:bg-secondary-700"
+                  ? "bg-white text-gray-900 border-2 border-gray-200"
+                  : "text-gray-600 hover:text-gray-900 bg-white hover:bg-gray-50 border border-gray-200"
               }`}
             >
               All
@@ -730,8 +638,8 @@ const BettingHistory = ({ userData, isLoading, error }) => {
               onClick={() => setFilter("wins")}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
                 filter === "wins"
-                  ? "bg-gaming-success text-white"
-                  : "text-white/70 hover:text-white bg-secondary-800 hover:bg-secondary-700"
+                  ? "bg-white text-[#22AD74] border-2 border-[#22AD74]"
+                  : "text-gray-600 hover:text-gray-900 bg-white hover:bg-gray-50 border border-gray-200"
               }`}
             >
               Wins
@@ -740,8 +648,8 @@ const BettingHistory = ({ userData, isLoading, error }) => {
               onClick={() => setFilter("losses")}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
                 filter === "losses"
-                  ? "bg-gaming-error text-white"
-                  : "text-white/70 hover:text-white bg-secondary-800 hover:bg-secondary-700"
+                  ? "bg-white text-red-600 border-2 border-red-200"
+                  : "text-gray-600 hover:text-gray-900 bg-white hover:bg-gray-50 border border-gray-200"
               }`}
             >
               Losses
@@ -750,7 +658,7 @@ const BettingHistory = ({ userData, isLoading, error }) => {
         </div>
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="text-white/70 hover:text-white transition-colors w-8 h-8 flex items-center justify-center rounded-lg hover:bg-secondary-800"
+          className="text-gray-600 hover:text-gray-900 transition-colors w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-50 border border-gray-200"
         >
           {isExpanded ? "↑" : "↓"}
         </button>
@@ -779,12 +687,12 @@ const BettingHistory = ({ userData, isLoading, error }) => {
                     damping: 30,
                     delay: index * 0.05,
                   }}
-                  className={`history-item p-4 rounded-xl border ${
+                  className={`history-item p-4 rounded-xl border transition-all duration-300 hover:shadow-[0_0_15px_rgba(34,173,116,0.15)] ${
                     group.totalPayout > group.totalAmount
-                      ? "bg-gaming-success/10 border-gaming-success/30"
+                      ? "bg-[#22AD74]/5 border-[#22AD74]/20"
                       : group.totalPayout < group.totalAmount
-                      ? "bg-gaming-error/10 border-gaming-error/30"
-                      : "bg-secondary-800 border-secondary-700"
+                      ? "bg-red-50 border-red-200"
+                      : "bg-white border-gray-200"
                   }`}
                 >
                   {/* Header */}
@@ -793,15 +701,15 @@ const BettingHistory = ({ userData, isLoading, error }) => {
                       <div
                         className={`w-8 h-8 rounded-lg flex items-center justify-center text-lg font-bold ${
                           group.winningNumber === 0
-                            ? "bg-emerald-500/30 text-emerald-300"
+                            ? "bg-emerald-50 text-emerald-600"
                             : isRed(group.winningNumber)
-                            ? "bg-gaming-primary/30 text-gaming-primary"
-                            : "bg-gray-800 text-white"
+                            ? "bg-red-50 text-red-600"
+                            : "bg-gray-50 text-gray-600"
                         }`}
                       >
                         {group.winningNumber}
                       </div>
-                      <div className="text-sm text-white/90">
+                      <div className="text-sm text-gray-600">
                         {group.bets.length > 4 ? (
                           <div className="flex flex-wrap gap-1.5 mt-1">
                             {group.bets.map((bet, idx) => {
@@ -810,7 +718,7 @@ const BettingHistory = ({ userData, isLoading, error }) => {
                               return (
                                 <span
                                   key={idx}
-                                  className="px-2.5 py-1 rounded-lg bg-secondary-800/50 text-xs border border-white/10 hover:border-[#22AD74]/30 hover:bg-secondary-800/80 transition-all duration-300 backdrop-blur-sm"
+                                  className="px-2.5 py-1 rounded-lg bg-white text-xs border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all duration-300"
                                 >
                                   {getBetTypeName(betType, numbers)}
                                 </span>
@@ -823,7 +731,7 @@ const BettingHistory = ({ userData, isLoading, error }) => {
                               const betType = Number(bet.betType);
                               const numbers = bet.numbers.map((n) => Number(n));
                               return (
-                                <span key={idx} className="mr-2">
+                                <span key={idx} className="mr-2 text-gray-600">
                                   {getBetTypeName(betType, numbers)}
                                   {idx < group.bets.length - 1 ? ", " : ""}
                                 </span>
@@ -836,10 +744,10 @@ const BettingHistory = ({ userData, isLoading, error }) => {
                     <div
                       className={`text-sm font-medium ${
                         group.totalPayout > group.totalAmount
-                          ? "text-gaming-success"
+                          ? "text-[#22AD74]"
                           : group.totalPayout < group.totalAmount
-                          ? "text-gaming-error"
-                          : "text-white/70"
+                          ? "text-red-600"
+                          : "text-gray-600"
                       }`}
                     >
                       {group.totalPayout > group.totalAmount
@@ -857,10 +765,10 @@ const BettingHistory = ({ userData, isLoading, error }) => {
                       const numbers = bet.numbers.map((n) => Number(n));
                       return (
                         <div key={i} className="flex justify-between text-sm">
-                          <span className="text-white/80">
+                          <span className="text-gray-600">
                             {getBetTypeName(betType, numbers)}
                           </span>
-                          <span className="font-medium text-white">
+                          <span className="font-medium text-gray-900">
                             {parseFloat(ethers.formatEther(bet.amount)).toFixed(
                               0
                             )}{" "}
@@ -872,18 +780,18 @@ const BettingHistory = ({ userData, isLoading, error }) => {
                   </div>
 
                   {/* Total */}
-                  <div className="mt-3 pt-3 border-t border-white/10">
+                  <div className="mt-3 pt-3 border-t border-gray-200">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-white/70">
+                      <span className="text-sm text-gray-600">
                         Total Payout
                       </span>
-                      <span className="font-bold text-white">
+                      <span className="font-bold text-gray-900">
                         {parseFloat(
                           ethers.formatEther(group.totalPayout)
                         ).toFixed(0)}{" "}
                         GAMA
                         {group.totalPayout > group.totalAmount && (
-                          <span className="text-gaming-success ml-1">
+                          <span className="text-[#22AD74] ml-1">
                             (+
                             {parseFloat(
                               ethers.formatEther(
@@ -905,115 +813,16 @@ const BettingHistory = ({ userData, isLoading, error }) => {
       </AnimatePresence>
 
       {filteredBets.length === 0 && (
-        <div className="text-center py-8 bg-secondary-800 rounded-xl border border-secondary-700">
+        <div className="text-center py-8 bg-white rounded-xl border border-gray-200">
           <div className="text-3xl mb-2 opacity-20">🎲</div>
-          <div className="text-white font-medium">
+          <div className="text-gray-900 font-medium">
             No betting history available
           </div>
-          <div className="text-white/70 text-sm mt-1">
+          <div className="text-gray-600 text-sm mt-1">
             Place your first bet to start your journey
           </div>
         </div>
       )}
-    </div>
-  );
-};
-
-// Add CompactHistory component
-const CompactHistory = ({ userData, account, contracts }) => {
-  // Add balance query
-  const { data: balanceData } = useQuery({
-    queryKey: ["balance", account, contracts?.token?.target],
-    queryFn: async () => {
-      if (!contracts?.token || !account) return null;
-
-      const [balance, tokenAllowance] = await Promise.all([
-        contracts.token.balanceOf(account),
-        contracts.token.allowance(account, contracts.roulette.target),
-      ]);
-
-      return {
-        balance,
-        allowance: tokenAllowance,
-      };
-    },
-    enabled: !!contracts?.token && !!account,
-    refetchInterval: 5000,
-  });
-
-  // Sort bets by timestamp in descending order (most recent first)
-  const sortedBets = userData
-    ? [...userData].sort((a, b) => b.timestamp - a.timestamp)
-    : [];
-
-  return (
-    <div className="rounded-2xl border border-white/10 shadow-2xl hover:shadow-3xl transition-all duration-300 p-4 space-y-4 bg-secondary-900/80">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xs font-medium text-secondary-300">Last Results</h2>
-      </div>
-
-      {/* Only show bet history if there are bets */}
-      {userData && userData.length > 0 && (
-        <div className="flex gap-1">
-          {sortedBets.slice(0, 3).map((bet, index) => (
-            <div
-              key={`${bet.timestamp}-${index}`}
-              className={`flex-1 p-2 rounded-lg border ${
-                bet.totalPayout > bet.totalAmount
-                  ? "bg-gaming-success/10 border-gaming-success/20"
-                  : "bg-gaming-error/10 border-gaming-error/20"
-              }`}
-            >
-              <div
-                className={`w-full h-6 rounded flex items-center justify-center text-sm font-medium ${
-                  isRed(bet.winningNumber)
-                    ? "bg-gaming-primary/20 text-gaming-primary"
-                    : "bg-gray-800/20 text-gray-300"
-                }`}
-              >
-                {bet.winningNumber}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Balance Display */}
-      <div className="flex items-center justify-between pt-2 border-t border-white/5">
-        <span className="text-xs text-secondary-400">Balance:</span>
-        {balanceData?.balance &&
-        Number(ethers.formatEther(balanceData.balance)) > 0 ? (
-          <span className="text-sm font-medium text-white">
-            {parseFloat(ethers.formatEther(balanceData.balance)).toFixed(2)}{" "}
-            GAMA
-          </span>
-        ) : (
-          <button
-            onClick={() =>
-              window.open(
-                "https://app.xspswap.finance/#/swap?outputCurrency=0x678adf7955d8f6dcaa9e2fcc1c5ba70bccc464e6",
-                "_blank"
-              )
-            }
-            className="text-sm px-3 py-1 rounded-lg bg-[#22AD74]/10 text-[#22AD74] hover:bg-[#22AD74]/20 transition-colors flex items-center gap-2"
-          >
-            <span>Get GAMA</span>
-            <svg
-              className="w-3 h-3"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M14 5l7 7m0 0l-7 7m7-7H3"
-              />
-            </svg>
-          </button>
-        )}
-      </div>
     </div>
   );
 };
@@ -1177,6 +986,19 @@ const RoulettePage = ({ contracts, account, onError, addToast }) => {
   // Get React Query client
   const queryClient = useQueryClient();
 
+  // Add balance query
+  const { data: balanceData } = useQuery({
+    queryKey: ["balance", account, contracts?.token?.target],
+    queryFn: async () => {
+      if (!contracts?.token || !account) return null;
+
+      const balance = await contracts.token.balanceOf(account);
+      return { balance };
+    },
+    enabled: !!contracts?.token && !!account,
+    refetchInterval: 5000,
+  });
+
   // Fetch user's betting data
   const {
     data: userData,
@@ -1314,6 +1136,15 @@ const RoulettePage = ({ contracts, account, onError, addToast }) => {
             return prev;
           }
 
+          // Check max bets per spin limit
+          if (prev.length >= CONTRACT_CONSTANTS.MAX_BETS_PER_SPIN) {
+            addToast(
+              `Maximum ${CONTRACT_CONSTANTS.MAX_BETS_PER_SPIN} bets allowed per spin`,
+              "error"
+            );
+            return prev;
+          }
+
           // Format and validate numbers array
           const formattedNumbers = numbers.map((n) => {
             const num = Number(n);
@@ -1347,7 +1178,12 @@ const RoulettePage = ({ contracts, account, onError, addToast }) => {
 
           // Validate single bet amount early
           if (betAmount > CONTRACT_CONSTANTS.MAX_BET_AMOUNT) {
-            addToast("Maximum bet amount exceeded for single bet", "error");
+            addToast(
+              `Maximum bet amount per position is ${ethers.formatEther(
+                CONTRACT_CONSTANTS.MAX_BET_AMOUNT
+              )} GAMA`,
+              "error"
+            );
             return prev;
           }
 
@@ -1359,7 +1195,12 @@ const RoulettePage = ({ contracts, account, onError, addToast }) => {
 
           // Validate total amount early
           if (newTotalAmount > CONTRACT_CONSTANTS.MAX_TOTAL_BET_AMOUNT) {
-            addToast("Maximum total bet amount would be exceeded", "error");
+            addToast(
+              `Maximum total bet amount is ${ethers.formatEther(
+                CONTRACT_CONSTANTS.MAX_TOTAL_BET_AMOUNT
+              )} GAMA`,
+              "error"
+            );
             return prev;
           }
 
@@ -1374,14 +1215,10 @@ const RoulettePage = ({ contracts, account, onError, addToast }) => {
 
           // Validate maximum potential payout early
           if (totalPotentialPayout > CONTRACT_CONSTANTS.MAX_POSSIBLE_PAYOUT) {
-            addToast("Maximum potential payout would be exceeded", "error");
-            return prev;
-          }
-
-          // Check maximum number of bets
-          if (prev.length >= CONTRACT_CONSTANTS.MAX_BETS_PER_SPIN) {
             addToast(
-              `Maximum ${CONTRACT_CONSTANTS.MAX_BETS_PER_SPIN} bets allowed per spin`,
+              `Maximum potential payout of ${ethers.formatEther(
+                CONTRACT_CONSTANTS.MAX_POSSIBLE_PAYOUT
+              )} GAMA would be exceeded`,
               "error"
             );
             return prev;
@@ -1402,7 +1239,9 @@ const RoulettePage = ({ contracts, account, onError, addToast }) => {
               BigInt(newBets[existingBetIndex].amount) + betAmount;
             if (newAmount > CONTRACT_CONSTANTS.MAX_BET_AMOUNT) {
               addToast(
-                "Maximum bet amount exceeded for this position",
+                `Maximum bet amount per position is ${ethers.formatEther(
+                  CONTRACT_CONSTANTS.MAX_BET_AMOUNT
+                )} GAMA`,
                 "error"
               );
               return prev;
@@ -1437,217 +1276,299 @@ const RoulettePage = ({ contracts, account, onError, addToast }) => {
 
   const handlePlaceBets = useCallback(async () => {
     if (!contracts?.roulette || !account || selectedBets.length === 0) return;
-    if (selectedBets.length > CONTRACT_CONSTANTS.MAX_BETS_PER_SPIN) {
-      onError(
-        new Error(
-          `Maximum ${CONTRACT_CONSTANTS.MAX_BETS_PER_SPIN} bets allowed per spin`
-        )
-      );
-      return;
-    }
 
-    let retryCount = 0;
+    // Store previous state for rollback
+    const previousState = {
+      bets: [...selectedBets],
+      totalAmount: totalBetAmount,
+    };
+
+    // Constants for retry and timeout
     const MAX_RETRIES = 3;
     const RETRY_DELAY = 2000; // 2 seconds
+    const TRANSACTION_TIMEOUT = 60000; // 60 seconds
+    const MIN_BET_AMOUNT = ethers.parseEther("1"); // 1 token minimum bet
 
-    const attemptTransaction = async () => {
+    let retryCount = 0;
+
+    while (retryCount < MAX_RETRIES) {
       try {
         setIsProcessing(true);
 
-        // Add debug checks for contract roles and balances
-        const [hasMinterRole, hasBurnerRole, allowance, userBalance] =
-          await Promise.all([
-            contracts.token.hasRole(
-              CONTRACT_CONSTANTS.MINTER_ROLE,
-              contracts.roulette.target
-            ),
-            contracts.token.hasRole(
-              CONTRACT_CONSTANTS.BURNER_ROLE,
-              contracts.roulette.target
-            ),
-            contracts.token.allowance(account, contracts.roulette.target),
-            contracts.token.balanceOf(account),
-          ]);
-
-        // Validate contract roles
-        if (!hasMinterRole || !hasBurnerRole) {
-          addToast(
-            "Roulette contract is missing required roles. Please contact support.",
-            "error"
-          );
-          return;
-        }
-
-        // Format bets for contract
+        // 1. Validate and format bets
+        const seenBetTypes = new Set();
         const betRequests = selectedBets.map((bet) => {
           // Validate bet type
           if (!BetTypes.isValid(bet.type)) {
             throw new Error(`Invalid bet type: ${bet.type}`);
           }
 
+          // Prevent duplicate bet types except for straight bets
+          if (bet.type !== BetTypes.STRAIGHT && seenBetTypes.has(bet.type)) {
+            throw new Error(
+              `Duplicate bet type detected: ${getBetTypeName(bet.type)}`
+            );
+          }
+          seenBetTypes.add(bet.type);
+
           // Get the correct number parameter based on bet type
-          let number = 0;
-          if (bet.type === BetTypes.STRAIGHT) {
-            number = bet.numbers[0];
-          } else if (bet.type === BetTypes.DOZEN_FIRST) {
-            number = 1;
-          } else if (bet.type === BetTypes.DOZEN_SECOND) {
-            number = 13;
-          } else if (bet.type === BetTypes.DOZEN_THIRD) {
-            number = 25;
-          } else if (bet.type === BetTypes.COLUMN_FIRST) {
-            number = 1;
-          } else if (bet.type === BetTypes.COLUMN_SECOND) {
-            number = 2;
-          } else if (bet.type === BetTypes.COLUMN_THIRD) {
-            number = 3;
+          let number;
+          switch (bet.type) {
+            case BetTypes.STRAIGHT:
+              // Improved straight bet validation
+              if (!bet.numbers || bet.numbers.length !== 1) {
+                throw new Error("Straight bet must have exactly one number");
+              }
+
+              const straightNumber = Number(bet.numbers[0]);
+
+              // Check if it's a valid number (0-36)
+              if (
+                !Number.isInteger(straightNumber) ||
+                straightNumber < 0 ||
+                straightNumber > 36
+              ) {
+                throw new Error(
+                  `Invalid number for straight bet: ${bet.numbers[0]}. Must be between 0 and 36`
+                );
+              }
+
+              number = straightNumber;
+              break;
+
+            case BetTypes.DOZEN_FIRST:
+              // Validate dozen bet numbers
+              if (!bet.numbers?.every((n) => n >= 1 && n <= 12)) {
+                throw new Error("Invalid numbers for first dozen bet");
+              }
+              number = 1;
+              break;
+
+            case BetTypes.DOZEN_SECOND:
+              if (!bet.numbers?.every((n) => n >= 13 && n <= 24)) {
+                throw new Error("Invalid numbers for second dozen bet");
+              }
+              number = 13;
+              break;
+
+            case BetTypes.DOZEN_THIRD:
+              if (!bet.numbers?.every((n) => n >= 25 && n <= 36)) {
+                throw new Error("Invalid numbers for third dozen bet");
+              }
+              number = 25;
+              break;
+
+            case BetTypes.COLUMN_FIRST:
+              if (!bet.numbers?.every((n) => (n - 1) % 3 === 0)) {
+                throw new Error("Invalid numbers for first column bet");
+              }
+              number = 1;
+              break;
+
+            case BetTypes.COLUMN_SECOND:
+              if (!bet.numbers?.every((n) => (n - 2) % 3 === 0)) {
+                throw new Error("Invalid numbers for second column bet");
+              }
+              number = 2;
+              break;
+
+            case BetTypes.COLUMN_THIRD:
+              if (!bet.numbers?.every((n) => n % 3 === 0)) {
+                throw new Error("Invalid numbers for third column bet");
+              }
+              number = 3;
+              break;
+
+            case BetTypes.RED:
+              if (!bet.numbers?.every((n) => isRed(n))) {
+                throw new Error("Invalid numbers for red bet");
+              }
+              number = 0;
+              break;
+
+            case BetTypes.BLACK:
+              if (!bet.numbers?.every((n) => !isRed(n) && n !== 0)) {
+                throw new Error("Invalid numbers for black bet");
+              }
+              number = 0;
+              break;
+
+            case BetTypes.EVEN:
+              if (!bet.numbers?.every((n) => n % 2 === 0 && n !== 0)) {
+                throw new Error("Invalid numbers for even bet");
+              }
+              number = 0;
+              break;
+
+            case BetTypes.ODD:
+              if (!bet.numbers?.every((n) => n % 2 === 1)) {
+                throw new Error("Invalid numbers for odd bet");
+              }
+              number = 0;
+              break;
+
+            case BetTypes.LOW:
+              if (!bet.numbers?.every((n) => n >= 1 && n <= 18)) {
+                throw new Error("Invalid numbers for low bet");
+              }
+              number = 0;
+              break;
+
+            case BetTypes.HIGH:
+              if (!bet.numbers?.every((n) => n >= 19 && n <= 36)) {
+                throw new Error("Invalid numbers for high bet");
+              }
+              number = 0;
+              break;
+
+            default:
+              throw new Error(`Unsupported bet type: ${bet.type}`);
+          }
+
+          // Validate amount
+          const amount = BigInt(bet.amount);
+          if (amount < MIN_BET_AMOUNT) {
+            throw new Error(`Minimum bet amount is 1 GAMA token`);
+          }
+          if (amount > CONTRACT_CONSTANTS.MAX_BET_AMOUNT) {
+            throw new Error(
+              `Maximum bet amount per position is ${ethers.formatEther(
+                CONTRACT_CONSTANTS.MAX_BET_AMOUNT
+              )} GAMA`
+            );
           }
 
           return {
             betTypeId: bet.type,
             number: number,
-            amount: BigInt(bet.amount).toString(),
+            amount: amount.toString(),
           };
         });
 
-        // Calculate total amount and validate
-        const totalAmount = selectedBets.reduce(
+        // 2. Validate total bets and amounts
+        if (betRequests.length > CONTRACT_CONSTANTS.MAX_BETS_PER_SPIN) {
+          throw new Error(
+            `Maximum ${CONTRACT_CONSTANTS.MAX_BETS_PER_SPIN} bets allowed per spin`
+          );
+        }
+
+        const totalAmount = betRequests.reduce(
           (sum, bet) => sum + BigInt(bet.amount),
           BigInt(0)
         );
 
-        // Calculate total potential payout
-        const totalPotentialPayout = selectedBets.reduce((sum, bet) => {
-          const { multiplier } = BetHelpers.getBetTypeInfo(bet.type);
-          const potentialWinnings =
-            (BigInt(bet.amount) * BigInt(multiplier)) / BigInt(10000);
-          return sum + potentialWinnings + BigInt(bet.amount); // Add original bet amount
-        }, BigInt(0));
-
-        // Validate maximum potential payout
-        if (totalPotentialPayout > CONTRACT_CONSTANTS.MAX_POSSIBLE_PAYOUT) {
-          addToast("Maximum potential payout exceeded.", "error");
-          return;
-        }
-
-        // Additional validations
-        if (userBalance < totalAmount) {
-          addToast("Insufficient balance to place bets.", "error");
-          return;
-        }
-
-        // Check allowance
-        if (allowance < totalAmount) {
-          addToast(
-            "Insufficient token allowance. Please approve more tokens.",
-            "error"
-          );
-          return;
-        }
-
-        // Validate total amount
         if (totalAmount > CONTRACT_CONSTANTS.MAX_TOTAL_BET_AMOUNT) {
-          addToast("Total bet amount exceeds maximum allowed.", "error");
-          return;
+          throw new Error(
+            `Total bet amount cannot exceed ${ethers.formatEther(
+              CONTRACT_CONSTANTS.MAX_TOTAL_BET_AMOUNT
+            )} GAMA`
+          );
         }
 
-        // Get current gas price and add 20% buffer
-        const provider = new ethers.BrowserProvider(window.ethereum);
-        const feeData = await provider.getFeeData();
-        const adjustedGasPrice = (feeData.gasPrice * BigInt(120)) / BigInt(100);
+        // 3. Pre-transaction checks
+        const [balance, allowance] = await Promise.all([
+          contracts.token.balanceOf(account),
+          contracts.token.allowance(account, contracts.roulette.target),
+        ]);
 
-        // Get signer and connect to contract
+        if (balance < totalAmount) {
+          throw new Error(
+            `Insufficient balance. Required: ${ethers.formatEther(
+              totalAmount
+            )} GAMA`
+          );
+        }
+
+        if (allowance < totalAmount) {
+          throw new Error(`Insufficient allowance. Please approve more tokens`);
+        }
+
+        // 4. Gas estimation and optimization
+        const provider = new ethers.BrowserProvider(window.ethereum);
         const signer = await provider.getSigner();
         const rouletteWithSigner = contracts.roulette.connect(signer);
 
-        // Place bets with adjusted gas settings and wait for more confirmations
+        // Dynamic gas estimation
+        const gasEstimate = await rouletteWithSigner.placeBet.estimateGas(
+          betRequests
+        );
+        const feeData = await provider.getFeeData();
+        const adjustedGasLimit = (gasEstimate * BigInt(120)) / BigInt(100); // 20% buffer
+        const adjustedGasPrice = (feeData.gasPrice * BigInt(120)) / BigInt(100); // 20% buffer
+
+        // 5. Execute transaction with timeout
         const tx = await rouletteWithSigner.placeBet(betRequests, {
+          gasLimit: adjustedGasLimit,
           gasPrice: adjustedGasPrice,
         });
 
-        // Wait for confirmations with timeout
-        const CONFIRMATION_TIMEOUT = 60000; // 60 seconds
-        const confirmationPromise = tx.wait(2);
+        // Wait for confirmation with timeout
+        const confirmationPromise = tx.wait(2); // Wait for 2 confirmations
         const timeoutPromise = new Promise((_, reject) =>
           setTimeout(
             () => reject(new Error("Transaction confirmation timeout")),
-            CONFIRMATION_TIMEOUT
+            TRANSACTION_TIMEOUT
           )
         );
 
         await Promise.race([confirmationPromise, timeoutPromise]);
 
-        // Reset state and update UI
+        // 6. Success handling
         setSelectedBets([]);
         setTotalBetAmount(BigInt(0));
         addToast("Bets placed successfully!", "success");
 
-        // Invalidate queries to refresh data
+        // 7. Refresh data
         queryClient.invalidateQueries(["rouletteHistory", account]);
         queryClient.invalidateQueries(["balance", account]);
+
+        break; // Exit retry loop on success
       } catch (error) {
         console.error("Bet placement error:", error);
 
-        // Check if error is due to network or transaction issues
-        const retryableErrors = [
-          "NETWORK_ERROR",
-          "TIMEOUT",
-          "UNPREDICTABLE_GAS_LIMIT",
-          "transaction failed",
-          "timeout",
-          "replacement underpriced",
-          "nonce has already been used",
-        ];
+        // Rollback state on failure
+        setSelectedBets(previousState.bets);
+        setTotalBetAmount(previousState.totalAmount);
 
-        const shouldRetry = retryableErrors.some(
-          (errMsg) =>
-            error.code === errMsg ||
-            error.message?.toLowerCase().includes(errMsg.toLowerCase())
-        );
-
-        if (shouldRetry && retryCount < MAX_RETRIES) {
-          retryCount++;
-          addToast(
-            `Transaction failed, retrying... (Attempt ${retryCount}/${MAX_RETRIES})`,
-            "warning"
-          );
-          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
-          return attemptTransaction();
-        }
-
-        // Enhanced error handling
+        // Handle specific error cases
         if (error.code === "CALL_EXCEPTION") {
-          // Try to extract error name from data if available
           const errorName = error.data ? error.data.split("(")[0] : null;
           const errorMessage =
             CONTRACT_ERRORS[errorName] ||
-            "Something went wrong. Please try again later.";
+            "Transaction failed. Please try again.";
           addToast(errorMessage, "error");
-          if (!CONTRACT_ERRORS[errorName]) {
-            onError(error);
-          }
+          break; // Don't retry on contract errors
         } else if (error.code === "ACTION_REJECTED") {
           addToast("Transaction rejected by user", "warning");
+          break; // Don't retry on user rejection
         } else if (error.code === "INSUFFICIENT_FUNDS") {
           addToast("Insufficient funds to cover gas fees", "error");
+          break; // Don't retry on insufficient funds
         } else if (error.code === "REPLACEMENT_UNDERPRICED") {
-          addToast("Transaction gas price too low. Please try again.", "error");
-        } else {
-          addToast("Something went wrong. Please try again later.", "error");
-          onError(error);
+          retryCount++;
+          if (retryCount < MAX_RETRIES) {
+            addToast(
+              `Transaction underpriced. Retrying... (${retryCount}/${MAX_RETRIES})`,
+              "warning"
+            );
+            await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
+            continue; // Retry with higher gas price
+          }
         }
+
+        // Generic error handling for other cases
+        addToast(error.message || "Failed to place bets", "error");
+        onError(error);
       } finally {
         setIsProcessing(false);
       }
-    };
-
-    // Start the first attempt
-    await attemptTransaction();
+    }
   }, [
     contracts?.roulette,
     contracts?.token,
     account,
     selectedBets,
+    totalBetAmount,
     addToast,
     onError,
     queryClient,
@@ -1719,16 +1640,16 @@ const RoulettePage = ({ contracts, account, onError, addToast }) => {
   // Get background color class based on number
   const getNumberBackgroundClass = useCallback((number) => {
     if (number === null || number === undefined) {
-      return "bg-gradient-to-br from-secondary-800 to-secondary-900 border-secondary-700";
+      return "bg-white border-gray-200";
     }
     const num = Number(number);
     if (num === 0) {
-      return "bg-gradient-to-br from-emerald-500 to-emerald-600 border-emerald-400";
+      return "bg-gradient-to-br from-[#22AD74]/90 to-[#22AD74]/70 border-[#22AD74]/20 text-white";
     }
     if (isRed(num)) {
-      return "bg-gradient-to-br from-gaming-primary to-gaming-primary/90 border-gaming-primary";
+      return "bg-gradient-to-br from-gaming-primary/90 to-gaming-accent/90 border-gaming-primary/20 text-white";
     }
-    return "bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700";
+    return "bg-gradient-to-br from-gray-800/90 to-gray-900/90 border-gray-700/20 text-white";
   }, []);
 
   // Handle token approval
@@ -1886,9 +1807,9 @@ const RoulettePage = ({ contracts, account, onError, addToast }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gaming-background relative">
+    <div className="min-h-screen bg-white relative overflow-x-hidden">
       <div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-50"
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-50 pointer-events-none"
         style={{
           backgroundImage: `url(${bgOverlay})`,
           zIndex: 0,
@@ -1906,7 +1827,7 @@ const RoulettePage = ({ contracts, account, onError, addToast }) => {
             </div>
             <div className="relative">
               <div className="h-px w-24 bg-gradient-to-r from-[#22AD74] to-transparent absolute left-1/2 -translate-x-1/2"></div>
-              <p className="text-secondary-400 text-lg max-w-2xl mx-auto mt-6 font-light tracking-wide">
+              <p className="text-gray-600 text-lg max-w-2xl mx-auto mt-6 font-light tracking-wide">
                 Play with GAMA Token on XDC Network for lightning-fast, secure,
                 and provably fair gaming.
               </p>
@@ -1914,10 +1835,10 @@ const RoulettePage = ({ contracts, account, onError, addToast }) => {
           </div>
 
           {/* Main Game Section */}
-          <div className="grid lg:grid-cols-[2fr_1fr] gap-8">
+          <div className="grid lg:grid-cols-[2fr_1fr] gap-8 h-full">
             {/* Left Column - Betting Board */}
-            <div className="space-y-6">
-              <div className="glass-panel transform hover:scale-[1.01] transition-all duration-300 hover:shadow-glow">
+            <div className="h-full">
+              <div className="bg-white p-6 rounded-xl border border-gray-200 transform hover:scale-[1.01] transition-all duration-300 hover:shadow-lg h-full">
                 <BettingBoard
                   onBetSelect={handleBetSelect}
                   selectedBets={selectedBets}
@@ -1929,78 +1850,164 @@ const RoulettePage = ({ contracts, account, onError, addToast }) => {
                   onClearBets={handleClearBets}
                 />
               </div>
-
-              <div className="glass-panel p-6 transform hover:scale-[1.01] transition-all duration-300">
-                <BetControls
-                  selectedChipValue={selectedChipValue}
-                  onChipValueChange={handleChipValueChange}
-                  selectedBets={selectedBets}
-                  onPlaceBets={handlePlaceBets}
-                  onApprove={handleApprove}
-                  isApproved={isApproved}
-                  isCheckingApproval={isCheckingApproval}
-                  disabled={isProcessing}
-                  gameState={{ isProcessing }}
-                />
-              </div>
             </div>
 
-            {/* Right Column - Stats & Compact History */}
-            <div className="space-y-6">
-              {/* Stats Cards */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="glass-panel p-4 transform hover:scale-105 transition-all duration-300">
-                  <div className="text-secondary-300 text-sm font-medium mb-1 whitespace-nowrap">
-                    Total Bets
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-white text-2xl font-bold">
-                      {selectedBets.length}
-                    </span>
-                    <span className="text-secondary-400 text-sm">
-                      positions
-                    </span>
-                  </div>
-                </div>
-                <div className="glass-panel p-4 transform hover:scale-105 transition-all duration-300">
-                  <div className="text-secondary-300 text-sm font-medium mb-1 whitespace-nowrap">
-                    Total Amount
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-white text-2xl font-bold">
-                      {parseFloat(ethers.formatEther(totalBetAmount)).toFixed(
-                        0
-                      )}
-                    </span>
-                    <span className="text-secondary-400 text-sm">GAMA</span>
-                  </div>
-                </div>
-              </div>
+            {/* Right Column - Betting Controls */}
+            <div className="h-full">
+              <div className="lg:sticky lg:top-6 h-full">
+                <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-[1.01] hover:border-[#22AD74]/20 flex flex-col h-full">
+                  {/* Stats Cards */}
+                  <div className="flex-1 space-y-4">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="bg-white px-2.5 py-1.5 rounded-lg border border-gray-200 transform hover:scale-[1.02] transition-all duration-300 hover:shadow-lg hover:border-[#22AD74]/20 group">
+                        <div className="text-gray-400 text-[10px] uppercase tracking-wider font-medium group-hover:text-[#22AD74] transition-colors">
+                          Bets
+                        </div>
+                        <div className="flex items-center gap-1 whitespace-nowrap mt-0.5 w-full overflow-hidden">
+                          <span className="text-gray-900 text-sm font-semibold min-w-[10px] text-right shrink-0 group-hover:text-[#22AD74] transition-colors">
+                            {selectedBets.length}
+                          </span>
+                          <span className="text-[#22AD74] text-[9px] uppercase tracking-wider font-medium shrink-0">
+                            positions
+                          </span>
+                        </div>
+                      </div>
+                      <div className="bg-white px-2.5 py-1.5 rounded-lg border border-gray-200 transform hover:scale-[1.02] transition-all duration-300 hover:shadow-lg hover:border-[#22AD74]/20 group">
+                        <div className="text-gray-400 text-[10px] uppercase tracking-wider font-medium group-hover:text-[#22AD74] transition-colors">
+                          Amount
+                        </div>
+                        <div className="flex items-center gap-1 whitespace-nowrap mt-0.5 w-full overflow-hidden">
+                          <span className="text-gray-900 text-sm font-semibold min-w-[10px] text-right shrink-0 group-hover:text-[#22AD74] transition-colors">
+                            {parseFloat(
+                              ethers.formatEther(totalBetAmount)
+                            ).toFixed(0)}
+                          </span>
+                          <span className="text-[#22AD74] text-[9px] uppercase tracking-wider font-medium shrink-0">
+                            GAMA
+                          </span>
+                        </div>
+                      </div>
+                    </div>
 
-              {/* Compact History */}
-              <div className="glass-panel p-4 transform hover:scale-[1.01] transition-all duration-300">
-                <div className="mb-3">
-                  <h3 className="text-lg font-semibold text-white/90 mb-1">
-                    Recent Activity
-                  </h3>
-                  <div className="h-0.5 w-16 bg-gradient-to-r from-gaming-primary to-gaming-accent"></div>
+                    {/* Balance Display */}
+                    <div className="bg-white px-2.5 py-2 rounded-lg border border-gray-200 transform hover:scale-[1.02] transition-all duration-300 hover:shadow-lg hover:border-[#22AD74]/20 group">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-gray-400 text-[10px] uppercase tracking-wider font-medium group-hover:text-[#22AD74] transition-colors">
+                            Balance
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-gray-900 text-sm font-semibold tracking-tight group-hover:text-[#22AD74] transition-colors">
+                            {balanceData?.balance
+                              ? Number(
+                                  ethers.formatEther(balanceData.balance)
+                                ).toLocaleString(undefined, {
+                                  minimumFractionDigits: 0,
+                                  maximumFractionDigits: 0,
+                                })
+                              : "0"}
+                          </span>
+                          <span className="text-[#22AD74] text-[9px] uppercase tracking-wider font-medium">
+                            GAMA
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Chip Selection */}
+                    <div className="space-y-2 transform hover:scale-[1.01] transition-all duration-300">
+                      <div className="flex items-center justify-between mb-1">
+                        <h3 className="text-[10px] uppercase tracking-wider font-medium text-gray-400">
+                          Chip Value
+                        </h3>
+                      </div>
+                      <div className="chip-selector grid grid-cols-3 grid-rows-2 gap-2.5">
+                        {CHIP_VALUES.map((chip) => (
+                          <button
+                            key={chip.value}
+                            onClick={() => handleChipValueChange(chip.value)}
+                            disabled={isProcessing}
+                            className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all duration-300 relative group
+                              ${
+                                selectedChipValue === chip.value
+                                  ? "bg-gradient-to-br from-[#22AD74] to-[#1a8f5e] text-white shadow-xl ring-2 ring-[#22AD74]/20 ring-offset-2 scale-110 z-10"
+                                  : "bg-gradient-to-br from-white to-gray-50 text-gray-700 hover:text-[#22AD74] border border-gray-200 hover:border-[#22AD74]/20 hover:shadow-lg hover:z-10"
+                              } ${
+                              isProcessing
+                                ? "opacity-50 cursor-not-allowed"
+                                : "cursor-pointer hover:scale-105"
+                            }`}
+                          >
+                            <span className="text-[13px] transform -translate-y-px">
+                              {chip.label}
+                            </span>
+                            {selectedChipValue === chip.value && (
+                              <div className="absolute -inset-0.5 rounded-full bg-[#22AD74]/10 animate-pulse pointer-events-none" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Place Bet Button */}
+                  <div className="mt-4 transform hover:scale-[1.01] transition-all duration-300">
+                    {isCheckingApproval ? (
+                      <button
+                        className="h-9 w-full bg-white text-gray-600 rounded-lg font-medium text-xs flex items-center justify-center gap-2 disabled:opacity-50 border border-gray-200 hover:shadow-lg transition-all duration-300"
+                        disabled={true}
+                      >
+                        <LoadingSpinner size="small" />
+                        Checking Approval...
+                      </button>
+                    ) : isApproved ? (
+                      <button
+                        onClick={handlePlaceBets}
+                        disabled={isProcessing || selectedBets.length === 0}
+                        className={`h-9 w-full rounded-lg font-medium text-xs flex items-center justify-center gap-2 transition-all duration-300 hover:shadow-lg
+                          ${
+                            isProcessing || selectedBets.length === 0
+                              ? "bg-white text-gray-400 border border-gray-200"
+                              : "bg-[#22AD74] text-white hover:scale-[1.02] shadow-md hover:shadow-lg border border-[#22AD74] hover:bg-[#22AD74]/90"
+                          }`}
+                      >
+                        {isProcessing ? (
+                          <>
+                            <LoadingSpinner size="small" />
+                            Processing...
+                          </>
+                        ) : (
+                          "Place Bets"
+                        )}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleApprove}
+                        disabled={isProcessing}
+                        className={`h-9 w-full rounded-lg font-medium text-xs flex items-center justify-center gap-2 transition-all duration-300 hover:shadow-lg
+                          ${
+                            isProcessing
+                              ? "bg-white text-gray-400 border border-gray-200"
+                              : "bg-white text-[#22AD74] hover:scale-[1.02] shadow-md hover:shadow-lg border border-[#22AD74] hover:bg-[#22AD74]/5"
+                          }`}
+                      >
+                        Approve Token
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <CompactHistory
-                  userData={userData}
-                  account={account}
-                  contracts={contracts}
-                />
               </div>
             </div>
           </div>
 
           {/* Bottom Section - Detailed History */}
-          <div className="glass-panel p-6 transform hover:scale-[1.01] transition-all duration-300">
+          <div className="bg-white p-6 rounded-xl border border-gray-200 transform hover:scale-[1.01] transition-all duration-300">
             <div className="mb-4">
-              <h3 className="text-2xl font-semibold text-white/90 mb-2">
+              <h3 className="text-2xl font-semibold text-gray-900 mb-2">
                 Betting History
               </h3>
-              <div className="h-0.5 w-24 bg-gradient-to-r from-gaming-primary to-gaming-accent"></div>
+              <div className="h-0.5 w-24 bg-gradient-to-r from-[#22AD74] to-[#22AD74]/20"></div>
             </div>
             <BettingHistory
               userData={userData}
@@ -2008,6 +2015,28 @@ const RoulettePage = ({ contracts, account, onError, addToast }) => {
               error={userDataError}
             />
           </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="relative z-10 py-8 text-center">
+        <div className="space-y-2">
+          <p className="text-gray-600 text-sm">
+            Crafted with <span className="text-[#22AD74] mx-1">♥</span> and
+            built on{" "}
+            <a
+              href="https://xdc.org/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-[#22AD74] hover:text-[#1a8f5e] transition-colors cursor-pointer"
+            >
+              XDC
+            </a>
+          </p>
+          <p className="text-gray-500 text-xs">
+            GAMA © 2024. Open source, for everyone.{" "}
+            <span className="text-[#22AD74]">#BuildOnXDC</span>
+          </p>
         </div>
       </div>
     </div>
