@@ -93,9 +93,14 @@ struct BetRequest {
 
 /**
  * @title Roulette
- * @dev A provably fair roulette game using Chainlink VRF for randomness
+ * @dev A provably fair roulette game using VRF for randomness
  */
 contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
+    // ============ Events ============
+    event BetPlaced(address indexed player, uint256 requestId);
+    event GameCompleted(address indexed player, uint256 requestId);
+    event GameRecovered(address indexed player, uint256 requestId);
+
     // ============ Custom Errors ============
     error InvalidBetParameters(string reason);
     error InvalidBetType(uint256 betType);
@@ -176,7 +181,7 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
      * @notice Contract constructor
      * @param _gamaTokenAddress Address of the token contract
      * @param vrfCoordinator Address of the VRF coordinator
-     * @param subscriptionId Chainlink VRF subscription ID
+     * @param subscriptionId VRF subscription ID
      * @param keyHash VRF key hash for the network
      * @param _callbackGasLimit Gas limit for VRF callback
      * @param _requestConfirmations Number of confirmations for VRF request
@@ -220,9 +225,12 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
         // 2. State checks and initial setup
         UserGameData storage user = userData[msg.sender];
         
-        // Check if user has an active game
+        // Check if user has an active game or pending request
         if (user.recentBets.length > 0 && user.recentBets[user.recentBets.length - 1].isActive) {
             revert InvalidBetParameters("User has an active game");
+        }
+        if (user.currentRequestId != 0) {
+            revert InvalidBetParameters("User has a pending request");
         }
         
         uint256 totalAmount;
@@ -294,17 +302,16 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
         }
         
         // 12. Add the new bet to history
-        if (user.recentBets.length >= MAX_HISTORY_SIZE) {
-            // Shift elements to make room for new bet
-            for (uint256 j = 0; j < user.recentBets.length - 1; j++) {
-                user.recentBets[j] = user.recentBets[j + 1];
-            }
-            // Update the last element
-            user.recentBets[user.recentBets.length - 1] = newBet;
-        } else {
-            // Add new bet to the end
+        if (user.recentBets.length < MAX_HISTORY_SIZE) {
             user.recentBets.push(newBet);
+        } else {
+            // Use circular buffer approach
+            uint256 index = user.historyIndex % MAX_HISTORY_SIZE;
+            user.recentBets[index] = newBet;
         }
+        user.historyIndex++;
+        
+        emit BetPlaced(msg.sender, requestId);
         
         return requestId;
     }
@@ -322,14 +329,18 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
             if (bets[i].amount == 0) revert InvalidBetParameters("Invalid bet amount");
             if (bets[i].amount > MAX_BET_AMOUNT) revert InvalidBetParameters("Single bet amount too large");
             
-            totalAmount += bets[i].amount;
+            uint256 newTotal = totalAmount + bets[i].amount;
+            if (newTotal < totalAmount) revert InvalidBetParameters("Total amount overflow");
+            totalAmount = newTotal;
             
             // Calculate potential payout based on bet type
             (BetType betType,) = _processBetRequest(bets[i]);
             uint256 multiplier = getPayoutMultiplier(betType);
             uint256 potentialPayout = (bets[i].amount * multiplier) / DENOMINATOR;
             
-            maxPossiblePayout += potentialPayout;
+            uint256 newMaxPayout = maxPossiblePayout + potentialPayout;
+            if (newMaxPayout < maxPossiblePayout) revert InvalidBetParameters("Max payout overflow");
+            maxPossiblePayout = newMaxPayout;
             
             // Ensures total of all bets doesn't exceed MAX_TOTAL_BET_AMOUNT (500k tokens)
             if (totalAmount > MAX_TOTAL_BET_AMOUNT) revert InvalidBetParameters("Total bet amount too large");
@@ -360,87 +371,6 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
     }
 
     /**
-     * @dev Process game for recovery or admin scenarios
-     * @param bets Array of bet requests
-     * @param user User game data
-     * @param totalAmount Total bet amount
-     * @return totalPayout Total payout amount
-     */
-    function _processGame(BetRequest[] calldata bets, UserGameData storage user, uint256 totalAmount) private returns (uint256 totalPayout) {
-        // This function is now only used for recovery/admin scenarios
-        // Normal gameplay uses VRF as implemented in fulfillRandomWords
-
-        // Use recovery result value instead of generating a random number
-        uint8 currentWinningNumber = RESULT_RECOVERED;
-        
-        // For recovery scenarios, we refund the bet amount without gambling
-        // This matches the approach in the Dice contract
-        totalPayout = totalAmount;
-        
-        // Process all bets and create bet history
-        BetDetails[] memory betDetails = new BetDetails[](bets.length);
-        
-        for (uint256 i = 0; i < bets.length; i++) {
-            // Convert betTypeId to BetType and get numbers
-            (BetType betType, uint8[] memory numbers) = _processBetRequest(bets[i]);
-            
-            // For recovery, we refund the exact bet amount without winnings calculation
-            uint256 payout = bets[i].amount;
-
-            // Store bet details in memory array
-            betDetails[i] = BetDetails({
-                betType: betType,
-                numbers: numbers,
-                amount: bets[i].amount,
-                payout: payout
-            });
-        }
-
-        // Update history with new bet
-        if (user.recentBets.length >= MAX_HISTORY_SIZE) {
-            // Shift elements to make room for new bet
-            for (uint256 j = 0; j < user.recentBets.length - 1; j++) {
-                user.recentBets[j] = user.recentBets[j + 1];
-            }
-            // Update the last element
-            user.recentBets[user.recentBets.length - 1].timestamp = block.timestamp;
-            user.recentBets[user.recentBets.length - 1].winningNumber = currentWinningNumber;
-            user.recentBets[user.recentBets.length - 1].completed = true;
-            user.recentBets[user.recentBets.length - 1].isActive = false;
-            
-            // Copy bet details one by one
-            delete user.recentBets[user.recentBets.length - 1].bets;
-            for (uint256 i = 0; i < betDetails.length; i++) {
-                user.recentBets[user.recentBets.length - 1].bets.push(betDetails[i]);
-            }
-        } else {
-            // Create new bet in storage directly
-            user.recentBets.push();
-            uint256 newIndex = user.recentBets.length - 1;
-            
-            user.recentBets[newIndex].timestamp = block.timestamp;
-            user.recentBets[newIndex].winningNumber = currentWinningNumber;
-            user.recentBets[newIndex].completed = true;
-            user.recentBets[newIndex].isActive = false;
-            
-            // Copy bet details one by one
-            for (uint256 i = 0; i < betDetails.length; i++) {
-                user.recentBets[newIndex].bets.push(betDetails[i]);
-            }
-        }
-
-        // Process payouts if any wins
-        if (totalPayout > 0) {
-            try gamaToken.mint(msg.sender, totalPayout) {
-            } catch {
-                revert MintFailed(msg.sender, totalPayout);
-            }
-        }
-        
-        return totalPayout;
-    }
-
-    /**
      * @dev Calculate payout for a bet
      * @param numbers Numbers covered by the bet
      * @param betType Type of bet
@@ -456,8 +386,16 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
             uint256 multiplier = getPayoutMultiplier(betType);
             if (multiplier == 0) revert("Invalid multiplier");
             
-            uint256 winnings = (betAmount * multiplier) / DENOMINATOR;
-            uint256 totalPayout = winnings + betAmount; // Add original bet amount to winnings
+            // Check for multiplication overflow
+            uint256 product = betAmount * multiplier;
+            if (product / betAmount != multiplier) revert InvalidBetParameters("Payout calculation overflow");
+            
+            uint256 winnings = product / DENOMINATOR;
+            if (winnings * DENOMINATOR != product) revert InvalidBetParameters("Payout division mismatch");
+            
+            // Check for addition overflow
+            uint256 totalPayout = winnings + betAmount;
+            if (totalPayout < winnings) revert InvalidBetParameters("Total payout overflow");
             
             if (totalPayout > MAX_POSSIBLE_PAYOUT) {
                 revert MaxPayoutExceeded(totalPayout, MAX_POSSIBLE_PAYOUT);
@@ -894,8 +832,9 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
     function fulfillRandomWords(uint256 requestId, uint256[] memory randomWords) internal override nonReentrant {
         // ===== CHECKS =====
         // 1. Validate VRF request
-        if (!s_requests[requestId].exists) revert InvalidBetParameters("Request not found");
-        if (s_requests[requestId].fulfilled) revert InvalidBetParameters("Request already fulfilled");
+        RequestStatus storage request = s_requests[requestId];
+        if (!request.exists) revert InvalidBetParameters("Request not found");
+        if (request.fulfilled) revert InvalidBetParameters("Request already fulfilled");
         if (randomWords.length != numWords) revert InvalidBetParameters("Invalid random words length");
 
         // 2. Validate player and game state
@@ -904,19 +843,20 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
         
         UserGameData storage user = userData[player];
         if (user.currentRequestId != requestId) revert InvalidBetParameters("Request ID mismatch");
-        if (!activeRequestIds[requestId]) revert InvalidBetParameters("Request ID not active");
         
         // Mark request as fulfilled to prevent race conditions
-        s_requests[requestId].fulfilled = true;
-        s_requests[requestId].randomWords = randomWords;
+        request.fulfilled = true;
+        request.randomWords = randomWords;
         user.requestFulfilled = true;
         
         // Find the active bet (should be the most recent one)
         if (user.recentBets.length == 0) {
-            // Clean up and return if no bets found
+            // Clean up ALL request data and return if no bets found
+            delete s_requests[requestId];
             delete requestToPlayer[requestId];
             delete activeRequestIds[requestId];
             user.currentRequestId = 0;
+            user.requestFulfilled = false;
             return;
         }
         
@@ -924,10 +864,12 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
         
         // Check if bet is still active
         if (!currentBet.isActive) {
-            // Game already recovered or force-stopped
+            // Game already recovered or force-stopped, clean up ALL request data
+            delete s_requests[requestId];
             delete requestToPlayer[requestId];
             delete activeRequestIds[requestId];
             user.currentRequestId = 0;
+            user.requestFulfilled = false;
             return;
         }
 
@@ -981,6 +923,8 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
         delete requestToPlayer[requestId];
         delete activeRequestIds[requestId];
         user.currentRequestId = 0;
+
+        emit GameCompleted(player, requestId);
     }
 
     /**
@@ -996,26 +940,28 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
         }
         
         Bet storage currentBet = user.recentBets[user.recentBets.length - 1];
-        
-        // Check if game is stale
-        bool isRequestStale = false;
-        
-        // VRF request pending too long
-        if (block.number > user.lastPlayedBlock + BLOCK_THRESHOLD) {
-            isRequestStale = true;
+        uint256 requestId = user.currentRequestId;
+
+        // Ensure there is a request to recover from
+        if (requestId == 0) {
+            revert InvalidBetParameters("No pending request to recover");
+        }
+
+        // Check for race condition with VRF callback first
+        if (s_requests[requestId].fulfilled && 
+            (block.number <= user.lastPlayedBlock + 10)) {
+            revert InvalidBetParameters("Request just fulfilled, let VRF complete");
         }
         
-        // Request fulfilled but callback failed
-        if (user.currentRequestId != 0 && s_requests[user.currentRequestId].fulfilled) {
-            isRequestStale = true;
-        }
+        // Check if game is stale - ALL conditions must be met
+        bool hasBlockThresholdPassed = block.number > user.lastPlayedBlock + BLOCK_THRESHOLD;
+        bool hasTimeoutPassed = block.timestamp > user.lastPlayedTimestamp + GAME_TIMEOUT;
+        bool hasVrfFailed = requestId != 0 && s_requests[requestId].exists && s_requests[requestId].fulfilled;
         
-        // Fallback timestamp check
-        if (!isRequestStale && block.timestamp > user.lastPlayedTimestamp + GAME_TIMEOUT) {
-            isRequestStale = true;
+        // All conditions must be met for recovery
+        if (!hasBlockThresholdPassed || !hasTimeoutPassed || !hasVrfFailed) {
+            revert InvalidBetParameters("Game not eligible for recovery yet");
         }
-        
-        if (!isRequestStale) revert InvalidBetParameters("Game not eligible for recovery yet");
 
         // ===== EFFECTS =====
         // Calculate total amount to refund
@@ -1025,25 +971,23 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
         }
         
         if (refundAmount == 0) revert InvalidBetParameters("Nothing to refund");
-
-        uint256 requestId = user.currentRequestId;
         
-        // Prevent race conditions with VRF callback
-        if (requestId != 0) {
-            // Mark as inactive to prevent VRF callback completion
-            currentBet.isActive = false;
-            
-            // Check for race condition with VRF callback
-            if (s_requests[requestId].fulfilled && 
-                (block.number <= user.lastPlayedBlock + 10)) {
-                revert InvalidBetParameters("Request just fulfilled, let VRF complete");
-            }
-            
-            // Clean up request mappings
-            delete requestToPlayer[requestId];
-            delete activeRequestIds[requestId];
-            delete s_requests[requestId];
+        // Clean up request data
+        delete s_requests[requestId];
+        delete requestToPlayer[requestId];
+        delete activeRequestIds[requestId];
+        
+        // Update current bet state
+        currentBet.completed = true;
+        currentBet.isActive = false;
+        currentBet.winningNumber = RESULT_RECOVERED;
+        
+        for (uint256 i = 0; i < currentBet.bets.length; i++) {
+            currentBet.bets[i].payout = currentBet.bets[i].amount;
         }
+        
+        user.currentRequestId = 0;
+        user.requestFulfilled = false;
 
         // ===== INTERACTIONS =====
         // Refund player
@@ -1059,16 +1003,7 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
         totalGamesPlayed++;
         totalPayoutAmount += refundAmount;
 
-        // Update current bet state
-        currentBet.completed = true;
-        currentBet.isActive = false;
-        currentBet.winningNumber = RESULT_RECOVERED;
-        
-        for (uint256 i = 0; i < currentBet.bets.length; i++) {
-            currentBet.bets[i].payout = currentBet.bets[i].amount;
-        }
-        
-        user.currentRequestId = 0;
+        emit GameRecovered(msg.sender, requestId);
     }
 
     /**
@@ -1085,6 +1020,23 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
         }
         
         Bet storage currentBet = user.recentBets[user.recentBets.length - 1];
+        uint256 requestId = user.currentRequestId;
+
+        // Check for race condition with VRF callback first
+        if (requestId != 0 && s_requests[requestId].fulfilled && 
+            (block.number <= user.lastPlayedBlock + 10)) {
+            revert InvalidBetParameters("Request just fulfilled, let VRF complete");
+        }
+
+        // Check if game is stale - ALL conditions must be met
+        bool hasBlockThresholdPassed = block.number > user.lastPlayedBlock + BLOCK_THRESHOLD;
+        bool hasTimeoutPassed = block.timestamp > user.lastPlayedTimestamp + GAME_TIMEOUT;
+        bool hasVrfFailed = requestId != 0 && s_requests[requestId].fulfilled;
+        
+        // All conditions must be met for force stop
+        if (!hasBlockThresholdPassed || !hasTimeoutPassed || !hasVrfFailed) {
+            revert InvalidBetParameters("Game not eligible for force stop yet");
+        }
 
         // Calculate total amount to refund
         uint256 refundAmount = 0;
@@ -1095,21 +1047,24 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
         if (refundAmount == 0) revert InvalidBetParameters("Nothing to refund");
 
         // ===== EFFECTS =====
-        uint256 requestId = user.currentRequestId;
-        
-        // Prevent race conditions
+        // Clean up request data
         if (requestId != 0) {
-            currentBet.isActive = false;
-            
-            if (s_requests[requestId].fulfilled && 
-                (block.number <= user.lastPlayedBlock + 10)) {
-                revert InvalidBetParameters("Request just fulfilled, let VRF complete");
-            }
-            
             delete requestToPlayer[requestId];
             delete activeRequestIds[requestId];
             delete s_requests[requestId];
         }
+
+        // Mark game as completed
+        currentBet.completed = true;
+        currentBet.isActive = false;
+        currentBet.winningNumber = RESULT_FORCE_STOPPED;
+        
+        for (uint256 i = 0; i < currentBet.bets.length; i++) {
+            currentBet.bets[i].payout = currentBet.bets[i].amount;
+        }
+        
+        user.currentRequestId = 0;
+        user.requestFulfilled = false;
 
         // ===== INTERACTIONS =====
         // Refund player
@@ -1125,16 +1080,7 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
         totalGamesPlayed++;
         totalPayoutAmount += refundAmount;
 
-        // Update current bet state
-        currentBet.completed = true;
-        currentBet.isActive = false;
-        currentBet.winningNumber = RESULT_FORCE_STOPPED;
-        
-        for (uint256 i = 0; i < currentBet.bets.length; i++) {
-            currentBet.bets[i].payout = currentBet.bets[i].amount;
-        }
-        
-        user.currentRequestId = 0;
+        emit GameRecovered(player, requestId);
     }
 
     /**
@@ -1255,24 +1201,14 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
         // Determine recovery eligibility
         recoveryEligible = false;
         if (isActive) {
-            bool isRequestStale = false;
+            // All conditions must be met for recovery eligibility
+            bool hasBlockThresholdPassed = block.number > user.lastPlayedBlock + BLOCK_THRESHOLD;
+            bool hasTimeoutPassed = block.timestamp > user.lastPlayedTimestamp + GAME_TIMEOUT;
+            bool hasVrfFailed = requestId != 0 && requestExists && requestProcessed;
             
-            // Check block threshold
-            if (block.number > user.lastPlayedBlock + BLOCK_THRESHOLD) {
-                isRequestStale = true;
-            }
-            
-            // Check for fulfilled but unprocessed request
-            if (requestId != 0 && requestExists && requestProcessed) {
-                isRequestStale = true;
-            }
-            
-            // Fallback timestamp check
-            if (!isRequestStale && block.timestamp > user.lastPlayedTimestamp + GAME_TIMEOUT) {
-                isRequestStale = true;
-            }
-            
-            recoveryEligible = isRequestStale;
+            // Only eligible if ALL conditions are met
+            recoveryEligible = hasBlockThresholdPassed && hasTimeoutPassed && hasVrfFailed;
         }
     }
 }
+
