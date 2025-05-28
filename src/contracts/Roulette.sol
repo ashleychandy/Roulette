@@ -26,6 +26,7 @@ interface IERC20 {
     function renounceRole(bytes32 role, address callerConfirmation) external;
     function mint(address account, uint256 amount) external;
     function burn(address account, uint256 amount) external;
+    function getRemainingMintable() external view returns (uint256);
 }
 
 /**
@@ -239,20 +240,28 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
         // 3. Pre-validate all bets and calculate totals in a single pass
         (totalAmount, maxPossiblePayout) = _validateAndCalculateTotals(betRequests);
 
-        // 4. Balance and allowance checks
+        // 4. Ensure maximum possible payout doesn't exceed the hardcoded limit
+        if (maxPossiblePayout > MAX_POSSIBLE_PAYOUT) {
+            revert MaxPayoutExceeded(maxPossiblePayout, MAX_POSSIBLE_PAYOUT);
+        }
+
+        // 5. Check if maximum possible payout doesn't exceed remaining mintable amount
+        uint256 remainingMintable = gamaToken.getRemainingMintable();
+        if (maxPossiblePayout > remainingMintable) {
+            revert MaxPayoutExceeded(maxPossiblePayout, remainingMintable);
+        }
+
+        // 6. Balance and allowance checks
         _checkBalancesAndAllowances(msg.sender, totalAmount);
 
         // ===== EFFECTS =====
-        // 5. Burn tokens first
-        try gamaToken.burn(msg.sender, totalAmount) {
-        } catch {
-            revert BurnFailed(msg.sender, totalAmount);
-        }
+        // 7. Burn tokens first
+        gamaToken.burn(msg.sender, totalAmount);
 
         // Update total wagered amount
         totalWageredAmount += totalAmount;
 
-        // 6. Request random number using VRF
+        // 8. Request random number using VRF
         requestId = COORDINATOR.requestRandomWords(
             s_keyHash,
             s_subscriptionId,
@@ -261,24 +270,24 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
             numWords
         );
 
-        // 7. Record the request
+        // 9. Record the request
         s_requests[requestId] = RequestStatus({
             randomWords: new uint256[](0),
             exists: true,
             fulfilled: false
         });
         
-        // 8. Store request mapping
+        // 10. Store request mapping
         requestToPlayer[requestId] = msg.sender;
         activeRequestIds[requestId] = true;
         
-        // 9. Update timestamp and block number
+        // 11. Update timestamp and block number
         user.lastPlayedTimestamp = block.timestamp;
         user.lastPlayedBlock = block.number;
         user.currentRequestId = requestId;
         user.requestFulfilled = false;
         
-        // 10. Create a new bet in history
+        // 12. Create a new bet in history
         Bet memory newBet = Bet({
             timestamp: block.timestamp,
             bets: new BetDetails[](betRequests.length),
@@ -287,7 +296,7 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
             isActive: true
         });
         
-        // 11. Process all bets
+        // 13. Process all bets
         for (uint256 i = 0; i < betRequests.length; i++) {
             // Convert betTypeId to BetType and get numbers
             (BetType betType, uint8[] memory numbers) = _processBetRequest(betRequests[i]);
@@ -301,7 +310,7 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
             });
         }
         
-        // 12. Add the new bet to history
+        // 14. Add the new bet to history
         if (user.recentBets.length < MAX_HISTORY_SIZE) {
             user.recentBets.push(newBet);
         } else {
@@ -907,21 +916,19 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
         // ===== INTERACTIONS =====
         // 7. Process payouts if any wins
         if (totalPayout > 0) {
-            try gamaToken.mint(player, totalPayout) {
-            } catch {
-                revert MintFailed(player, totalPayout);
-            }
+            gamaToken.mint(player, totalPayout);
             
             // Update total payout amount
             totalPayoutAmount += totalPayout;
         }
         
         // 8. Increment total games played
-        totalGamesPlayed++;
+        unchecked { ++totalGamesPlayed; }
         
         // 9. Clean up request data
         delete requestToPlayer[requestId];
         delete activeRequestIds[requestId];
+        delete s_requests[requestId];
         user.currentRequestId = 0;
 
         emit GameCompleted(player, requestId);
@@ -995,14 +1002,8 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
             revert MissingContractRole(MINTER_ROLE);
         }
         
-        try gamaToken.mint(msg.sender, refundAmount) {} catch {
-            revert MintFailed(msg.sender, refundAmount);
-        }
-
-        // Update statistics
-        totalGamesPlayed++;
-        totalPayoutAmount += refundAmount;
-
+        gamaToken.mint(msg.sender, refundAmount);
+        
         emit GameRecovered(msg.sender, requestId);
     }
 
@@ -1072,13 +1073,7 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
             revert MissingContractRole(MINTER_ROLE);
         }
         
-        try gamaToken.mint(player, refundAmount) {} catch {
-            revert MintFailed(player, refundAmount);
-        }
-
-        // Update statistics
-        totalGamesPlayed++;
-        totalPayoutAmount += refundAmount;
+        gamaToken.mint(player, refundAmount);
 
         emit GameRecovered(player, requestId);
     }
@@ -1211,4 +1206,3 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
         }
     }
 }
-
