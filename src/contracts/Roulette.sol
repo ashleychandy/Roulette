@@ -25,8 +25,8 @@ interface IERC20 {
     function revokeRole(bytes32 role, address account) external;
     function renounceRole(bytes32 role, address callerConfirmation) external;
     function mint(address account, uint256 amount) external;
-    function burn(uint256 amount) external;
-    function burnFrom(address account, uint256 amount) external;
+    function controlledBurn(uint256 amount) external;
+    function controlledBurnFrom(address account, uint256 amount) external;
     function getRemainingMintable() external view returns (uint256);
 }
 
@@ -257,7 +257,7 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
 
         // ===== EFFECTS =====
         // 7. Burn tokens first
-        gamaToken.burnFrom(msg.sender, totalAmount);
+        gamaToken.controlledBurnFrom(msg.sender, totalAmount);
 
         // Update total wagered amount
         totalWageredAmount += totalAmount;
@@ -961,13 +961,15 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
             revert InvalidBetParameters("Request just fulfilled, let VRF complete");
         }
         
-        // Check if game is stale - ALL conditions must be met
+        // Check if game is stale - with modified conditions
         bool hasBlockThresholdPassed = block.number > user.lastPlayedBlock + BLOCK_THRESHOLD;
         bool hasTimeoutPassed = block.timestamp > user.lastPlayedTimestamp + GAME_TIMEOUT;
-        bool hasVrfFailed = requestId != 0 && s_requests[requestId].exists && s_requests[requestId].fulfilled;
         
-        // All conditions must be met for recovery
-        if (!hasBlockThresholdPassed || !hasTimeoutPassed || !hasVrfFailed) {
+        // Modified: Only require that the request exists, not that it's processed
+        bool hasVrfRequest = requestId != 0 && s_requests[requestId].exists;
+        
+        // Check eligibility with modified conditions
+        if (!hasBlockThresholdPassed || !hasTimeoutPassed || !hasVrfRequest) {
             revert InvalidBetParameters("Game not eligible for recovery yet");
         }
 
@@ -1030,13 +1032,15 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
             revert InvalidBetParameters("Request just fulfilled, let VRF complete");
         }
 
-        // Check if game is stale - ALL conditions must be met
+        // Check if game is stale - with modified conditions
         bool hasBlockThresholdPassed = block.number > user.lastPlayedBlock + BLOCK_THRESHOLD;
         bool hasTimeoutPassed = block.timestamp > user.lastPlayedTimestamp + GAME_TIMEOUT;
-        bool hasVrfFailed = requestId != 0 && s_requests[requestId].fulfilled;
         
-        // All conditions must be met for force stop
-        if (!hasBlockThresholdPassed || !hasTimeoutPassed || !hasVrfFailed) {
+        // Modified: Only require that the request exists, not that it's processed
+        bool hasVrfRequest = requestId != 0 && s_requests[requestId].exists;
+        
+        // Check eligibility with modified conditions
+        if (!hasBlockThresholdPassed || !hasTimeoutPassed || !hasVrfRequest) {
             revert InvalidBetParameters("Game not eligible for force stop yet");
         }
 
@@ -1200,10 +1204,11 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
             // All conditions must be met for recovery eligibility
             bool hasBlockThresholdPassed = block.number > user.lastPlayedBlock + BLOCK_THRESHOLD;
             bool hasTimeoutPassed = block.timestamp > user.lastPlayedTimestamp + GAME_TIMEOUT;
-            bool hasVrfFailed = requestId != 0 && requestExists && requestProcessed;
+            // Updated to match new recovery condition
+            bool hasVrfRequest = requestId != 0 && requestExists;
             
             // Only eligible if ALL conditions are met
-            recoveryEligible = hasBlockThresholdPassed && hasTimeoutPassed && hasVrfFailed;
+            recoveryEligible = hasBlockThresholdPassed && hasTimeoutPassed && hasVrfRequest;
         }
     }
 }
