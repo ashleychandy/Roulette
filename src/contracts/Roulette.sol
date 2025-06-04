@@ -25,8 +25,8 @@ interface IERC20 {
     function revokeRole(bytes32 role, address account) external;
     function renounceRole(bytes32 role, address callerConfirmation) external;
     function mint(address account, uint256 amount) external;
-    function controlledBurn(uint256 amount) external;
-    function controlledBurnFrom(address account, uint256 amount) external;
+    function burn(uint256 amount) external;
+    function burnFrom(address account, uint256 amount) external;
     function getRemainingMintable() external view returns (uint256);
 }
 
@@ -257,7 +257,7 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
 
         // ===== EFFECTS =====
         // 7. Burn tokens first
-        gamaToken.controlledBurnFrom(msg.sender, totalAmount);
+        gamaToken.burnFrom(msg.sender, totalAmount);
 
         // Update total wagered amount
         totalWageredAmount += totalAmount;
