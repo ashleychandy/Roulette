@@ -3,7 +3,7 @@
   "name": "GAMA Roulette Game",
   "icons": [
     {
-      "src": "assets/ms-icon-310x310.png",
+      "src": "assets/gama.png",
       "sizes": "310x310",
       "type": "image/png"
     }
