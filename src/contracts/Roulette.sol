@@ -10,7 +10,7 @@ import "lib/contractsv2/src/v0.8/VRFConsumerBaseV2.sol";
 
 /**
  * @title IERC20
- * @dev ERC20 interface with role-based functionality
+ * @dev ERC20 interface for token interactions
  */
 interface IERC20 {
     function totalSupply() external view returns (uint256);
@@ -19,11 +19,6 @@ interface IERC20 {
     function allowance(address owner, address spender) external view returns (uint256);
     function approve(address spender, uint256 amount) external returns (bool);
     function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
-    function hasRole(bytes32 role, address account) external view returns (bool);
-    function getRoleAdmin(bytes32 role) external view returns (bytes32);
-    function grantRole(bytes32 role, address account) external;
-    function revokeRole(bytes32 role, address account) external;
-    function renounceRole(bytes32 role, address callerConfirmation) external;
     function mint(address account, uint256 amount) external;
     function burn(uint256 amount) external;
     function burnFrom(address account, uint256 amount) external;
@@ -110,7 +105,6 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
     error TransferFailed(address from, address to, uint256 amount);
     error BurnFailed(address account, uint256 amount);
     error MintFailed(address account, uint256 amount);
-    error MissingContractRole(bytes32 role);
     error InsufficientAllowance(uint256 required, uint256 allowed);
     error MaxPayoutExceeded(uint256 potentialPayout, uint256 maxAllowed);
 
@@ -129,10 +123,6 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
     uint8 public constant RESULT_FORCE_STOPPED = 254;
     uint8 public constant RESULT_RECOVERED = 255;
     
-    // Token-related constants
-    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
-    bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE");
-
     // Bet type number mappings for frontend
     uint8 public constant STRAIGHT_BET = 0;
     uint8 public constant DOZEN_BET_FIRST = 1;    // 1-12
@@ -358,9 +348,9 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
     }
 
     /**
-     * @dev Check player balance, allowance, and contract roles
-     * @param player Player address
-     * @param totalAmount Total amount to check
+     * @dev Check if user has sufficient balance and allowance
+     * @param player User address
+     * @param totalAmount Total bet amount
      */
     function _checkBalancesAndAllowances(address player, uint256 totalAmount) private view {
         if (gamaToken.balanceOf(player) < totalAmount) {
@@ -371,13 +361,6 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
             revert InsufficientAllowance(totalAmount, gamaToken.allowance(player, address(this)));
         }
 
-        if (!gamaToken.hasRole(BURNER_ROLE, address(this))) {
-            revert MissingContractRole(BURNER_ROLE);
-        }
-
-        if (!gamaToken.hasRole(MINTER_ROLE, address(this))) {
-            revert MissingContractRole(MINTER_ROLE);
-        }
     }
 
     /**
@@ -1001,10 +984,6 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
 
         // ===== INTERACTIONS =====
         // Refund player
-        if (!gamaToken.hasRole(MINTER_ROLE, address(this))) {
-            revert MissingContractRole(MINTER_ROLE);
-        }
-        
         gamaToken.mint(msg.sender, refundAmount);
         
         emit GameRecovered(msg.sender, requestId);
@@ -1074,10 +1053,6 @@ contract Roulette is ReentrancyGuard, Pausable, VRFConsumerBaseV2, Ownable {
 
         // ===== INTERACTIONS =====
         // Refund player
-        if (!gamaToken.hasRole(MINTER_ROLE, address(this))) {
-            revert MissingContractRole(MINTER_ROLE);
-        }
-        
         gamaToken.mint(player, refundAmount);
 
         emit GameRecovered(player, requestId);

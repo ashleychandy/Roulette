@@ -1,82 +1,73 @@
 # GAMA Roulette
 
-A decentralized roulette game built on the XDC Network using React and smart contracts.
+A blockchain-based roulette game running on the XDC network.
 
-## Prerequisites
-
-- Node.js (v14 or higher)
-- npm or yarn
-- MetaMask wallet extension
-- XDC Network account with some XDC tokens
-
-## Environment Variables
-
-Create a `.env` file in the root directory with the following variables:
-
-```env
-REACT_APP_XDC_MAINNET_RPC=https://rpc.xinfin.network
-REACT_APP_XDC_APOTHEM_RPC=https://rpc.apothem.network
-REACT_APP_TOKEN_ADDRESS=your_mainnet_token_address
-REACT_APP_ROULETTE_ADDRESS=your_mainnet_roulette_address
-REACT_APP_APOTHEM_TOKEN_ADDRESS=your_testnet_token_address
-REACT_APP_APOTHEM_ROULETTE_ADDRESS=your_testnet_roulette_address
-```
-
-## Installation
-
-1. Clone the repository:
+## Quick Start
 
 ```bash
-git clone <repository-url>
-cd Roulette
-```
-
-2. Install dependencies:
-
-```bash
+# Install dependencies
 npm install
-# or
-yarn install
+
+# Start development server
+npm run start
+
+# Build for production
+npm run build
+
+# Run tests
+npm run test
+
+# Format code
+npm run format
 ```
 
-## Running the Application
-
-1. Start the development server:
-
-```bash
-npm start
-# or
-yarn start
-```
-
-## Connecting to the Network
-
-1. Make sure you have MetaMask installed and set up
-2. Add XDC Network to MetaMask:
-
-   - **XDC Mainnet**:
-
-     - Network Name: XDC Mainnet
-     - RPC URL: https://erpc.xinfin.network
-     - Chain ID: 50
-     - Symbol: XDC
-     - Block Explorer: https://explorer.xinfin.network
-
-   - **XDC Apothem Testnet**:
-     - Network Name: XDC Apothem Testnet
-     - RPC URL: https://erpc.apothem.network
-     - Chain ID: 51
-     - Symbol: XDC
-     - Block Explorer: https://explorer.apothem.network
+The production build will create a `build` directory with optimized files ready for deployment. This includes minified JavaScript bundles, compressed assets, and an index.html file.
 
 ## Features
 
-- Connect wallet using MetaMask
-- Switch between XDC Mainnet and Apothem Testnet
-- Place bets using GAMA tokens
-- Beautiful and responsive UI with animations
-- Real-time updates and notifications
+- Decentralized roulette game on XDC blockchain
+- Interactive roulette wheel with animations powered by Framer Motion
+- Real-time game statistics and betting history
+- Responsive design with Tailwind CSS
+- VRF (Verifiable Random Function) based fair gameplay
+- Wallet integration for XDC network
 
-## Support
+## Environment Variables
 
-For any queries or support, please visit [https://gamacoin.ai/](https://gamacoin.ai/)
+Create a `.env` file in the root directory with these variables:
+
+```
+# XDC Mainnet
+REACT_APP_TOKEN_ADDRESS=<mainnet-token-contract-address>
+REACT_APP_ROULETTE_ADDRESS=<mainnet-roulette-contract-address>
+REACT_APP_XDC_MAINNET_RPC=https://erpc.xinfin.network
+
+# XDC Testnet (Apothem)
+REACT_APP_APOTHEM_TOKEN_ADDRESS=<testnet-token-contract-address>
+REACT_APP_APOTHEM_ROULETTE_ADDRESS=<testnet-roulette-contract-address>
+REACT_APP_XDC_APOTHEM_RPC=https://erpc.apothem.network
+
+# Default Network (mainnet or testnet)
+REACT_APP_DEFAULT_NETWORK=mainnet
+```
+
+## Game Features
+
+- Place multiple types of bets on the roulette board
+- Real-time updates of game state
+- Bet history tracking
+- VRF-powered fair random number generation
+- Automatic recovery of interrupted games
+ Framer Motion for animations
+
+```bash
+# Run linting
+npm run lint
+
+# Fix linting issues
+npm run lint:fix
+
+# Format code
+npm run format
+```
+
