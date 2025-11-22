@@ -5,8 +5,8 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-import "lib/contractsv2/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
-import "lib/contractsv2/src/v0.8/VRFConsumerBaseV2.sol";
+import "@goplugin/contracts2_3/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
+import "@goplugin/contracts2_3/src/v0.8/VRFConsumerBaseV2.sol";
 
 /**
  * @title IERC20
